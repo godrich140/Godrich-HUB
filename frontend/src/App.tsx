@@ -207,6 +207,12 @@ export function App() {
     setRows((current) => [...current, row(String(Date.now()))]);
   }
 
+  function clearRows() {
+    if (!window.confirm("确定要清空当前明细录入吗？")) return;
+    setRows([row(String(Date.now()))]);
+    setSelectedRows([]);
+  }
+
   function toggleSelectedRow(rowId: string) {
     setSelectedRows((current) => (current.includes(rowId) ? current.filter((id) => id !== rowId) : [...current, rowId]));
   }
@@ -296,6 +302,7 @@ export function App() {
             onMergeRows={mergeSelectedRows}
             onUnmergeRows={unmergeSelectedRows}
             onUploadOcr={handleUploadOcr}
+            onClearRows={clearRows}
             suggestions={suggestions}
             onOpenCustomerModal={() => setCustomerModalOpen(true)}
             onOpenDetailModal={() => setDetailModalOpen(true)}
@@ -308,7 +315,14 @@ export function App() {
 
       {customerModalOpen && <CustomerPicker customers={customers} onClose={() => setCustomerModalOpen(false)} onSelect={setSelectedCustomer} onSaveCustomer={saveCustomer} />}
       {detailModalOpen && (
-        <ResizableDetailModal rows={rows} suggestions={suggestions} onClose={() => setDetailModalOpen(false)} onUpdateRow={updateRow} onAddRow={addRow} />
+        <ResizableDetailModal
+          rows={rows}
+          suggestions={suggestions}
+          onClose={() => setDetailModalOpen(false)}
+          onUpdateRow={updateRow}
+          onAddRow={addRow}
+          onClearRows={clearRows}
+        />
       )}
     </div>
   );
@@ -328,6 +342,7 @@ function WorkbenchPage(props: {
   onMergeRows: () => void;
   onUnmergeRows: () => void;
   onUploadOcr: () => void;
+  onClearRows: () => void;
   suggestions: Record<"itemName" | "description", string[]>;
   onOpenCustomerModal: () => void;
   onOpenDetailModal: () => void;
@@ -385,6 +400,7 @@ function WorkbenchPage(props: {
               <button className="secondary-button" type="button" onClick={props.onOpenDetailModal}>弹出录入</button>
               <button className="secondary-button" type="button" onClick={props.onMergeRows}>合并选中行</button>
               <button className="ghost-button" type="button" onClick={props.onUnmergeRows}>取消合并</button>
+              <button className="danger-button" type="button" onClick={props.onClearRows}>清空明细录入</button>
               <button className="primary-button" type="button" onClick={props.onAddRow}>新增一行</button>
             </div>
           </div>
@@ -760,6 +776,7 @@ function ResizableDetailModal(props: {
   onClose: () => void;
   onUpdateRow: (rowId: string, key: PackingCellKey, value: string) => void;
   onAddRow: () => void;
+  onClearRows: () => void;
 }) {
   return (
     <div className="modal-backdrop">
@@ -768,6 +785,7 @@ function ResizableDetailModal(props: {
           <h2>弹出明细录入</h2>
           <div className="panel-actions">
             <button className="secondary-button" type="button" onClick={props.onAddRow}>新增一行</button>
+            <button className="danger-button" type="button" onClick={props.onClearRows}>清空明细录入</button>
             <button className="ghost-button" type="button" onClick={props.onClose}>关闭</button>
           </div>
         </div>

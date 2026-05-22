@@ -135,6 +135,7 @@ h2 {
 .primary-button,
 .secondary-button,
 .ghost-button,
+.danger-button,
 .upload-control {
   min-height: 38px;
   border-radius: 6px;
@@ -162,6 +163,17 @@ h2 {
   background: transparent;
   border-color: var(--line);
   color: var(--muted);
+}
+
+.danger-button {
+  background: #fff7f4;
+  border-color: #e2b7aa;
+  color: var(--danger);
+}
+
+.danger-button:hover {
+  background: #fdece6;
+  border-color: var(--danger);
 }
 
 .summary-strip {
