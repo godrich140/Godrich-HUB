@@ -178,7 +178,8 @@ export function App() {
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [rows, setRows] = useState(initialRows);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [ocrStatus, setOcrStatus] = useState<"未上传" | "识别成功" | "识别失败">("未上传");
+  const [ocrStatus, setOcrStatus] = useState("未识别");
+  const [ocrProgress, setOcrProgress] = useState(0);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
@@ -252,7 +253,12 @@ export function App() {
   }
 
   function handleUploadOcr() {
-    setOcrStatus("识别成功");
+    setOcrStatus("识别中");
+    setOcrProgress(68);
+    window.setTimeout(() => {
+      setOcrStatus("识别成功");
+      setOcrProgress(100);
+    }, 700);
     setRows((current) => {
       const target = current[0] ?? row(String(Date.now()));
       const nextRows = current.length ? [...current] : [target];
@@ -296,6 +302,7 @@ export function App() {
             selectedRows={selectedRows}
             totals={totals}
             ocrStatus={ocrStatus}
+            ocrProgress={ocrProgress}
             onAddRow={addRow}
             onUpdateRow={updateRow}
             onToggleRow={toggleSelectedRow}
@@ -336,6 +343,7 @@ function WorkbenchPage(props: {
   selectedRows: string[];
   totals: { quantity: number; amount: number; cartons: number };
   ocrStatus: string;
+  ocrProgress: number;
   onAddRow: () => void;
   onUpdateRow: (rowId: string, key: PackingCellKey, value: string) => void;
   onToggleRow: (rowId: string) => void;
@@ -411,7 +419,7 @@ function WorkbenchPage(props: {
           <section className="panel-section">
             <h2>照片识别</h2>
             <div
-              className={props.ocrStatus === "识别成功" ? "drag-upload success" : "drag-upload"}
+              className={props.ocrStatus === "识别成功" ? "drag-upload success" : "drag-upload recognizing"}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
@@ -419,7 +427,16 @@ function WorkbenchPage(props: {
               }}
             >
               <strong>{props.ocrStatus}</strong>
-              <span>拖拽手写照片到此处，或点击下方按钮上传。</span>
+              <span>拖拽或点击上传手写照片，支持 JPG / PNG / WebP</span>
+            </div>
+            <div className="ocr-progress" aria-label="照片识别进度">
+              <div className="progress-row">
+                <span>{props.ocrStatus}</span>
+                <strong>{props.ocrProgress}%</strong>
+              </div>
+              <div className="progress-track">
+                <span style={{ width: `${props.ocrProgress}%` }} />
+              </div>
             </div>
             <label className="upload-control">
               <input type="file" accept="image/*" onChange={props.onUploadOcr} />
@@ -509,35 +526,93 @@ function PackingTable(props: {
 function HistoryPage({ records }: { records: OrderRecord[] }) {
   const [keyword, setKeyword] = useState("");
   const [date, setDate] = useState("");
+  const [status, setStatus] = useState("全部");
+  const [activeId, setActiveId] = useState(records[0]?.id ?? "");
   const filtered = records.filter((record) => {
     const matchKeyword = !keyword || `${record.id}${record.customer}`.toLowerCase().includes(keyword.toLowerCase());
     const matchDate = !date || record.date === date;
-    return matchKeyword && matchDate;
+    const matchStatus = status === "全部" || record.status === status;
+    return matchKeyword && matchDate && matchStatus;
   });
+  const activeRecord = filtered.find((record) => record.id === activeId) ?? filtered[0];
+  const totalRows = filtered.reduce((sum, record) => sum + record.rows.length, 0);
+  const totalAmount = filtered.reduce(
+    (sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.totalPrice), 0),
+    0
+  );
+  const totalCartons = filtered.reduce(
+    (sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0),
+    0
+  );
 
   return (
     <>
-      <PageHeader title="历史单据">
-        <button className="primary-button" type="button">查询</button>
+      <PageHeader title="历史装箱单">
+        <button className="secondary-button" type="button">批量导出</button>
+        <button className="primary-button" type="button">新建装箱单</button>
       </PageHeader>
-      <section className="query-band">
-        <label className="field">编号<input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入单据编号或客户" /></label>
-        <label className="field">日期<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-        <label className="field">客户<input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入客户名称" /></label>
+
+      <section className="history-overview">
+        <Summary label="匹配单据" value={String(filtered.length)} />
+        <Summary label="明细行" value={String(totalRows)} />
+        <Summary label="总金额" value={`$${totalAmount.toFixed(2)}`} />
+        <Summary label="总箱数" value={String(totalCartons)} />
       </section>
-      <div className="record-list">
-        {filtered.map((record) => (
-          <section className="record-card" key={record.id}>
-            <div className="record-head">
-              <strong>{record.id}</strong>
-              <span>{record.date}</span>
-              <span>{record.customer}</span>
-              <span>{record.status}</span>
+
+      <section className="query-band history-query">
+        <label className="field">单据 / 客户<input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入单据编号或客户名称" /></label>
+        <label className="field">日期<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+        <label className="field">状态<select value={status} onChange={(event) => setStatus(event.target.value)}><option>全部</option><option>草稿</option><option>已生成</option><option>已导出</option></select></label>
+      </section>
+
+      <section className="history-layout">
+        <div className="record-list history-list">
+          {filtered.map((record) => {
+            const amount = record.rows.reduce((sum, item) => sum + toNumber(item.totalPrice), 0);
+            const cartons = record.rows.reduce((sum, item) => sum + toNumber(item.cartonCount), 0);
+            return (
+              <button
+                className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"}
+                key={record.id}
+                onClick={() => setActiveId(record.id)}
+                type="button"
+              >
+                <div className="record-head">
+                  <strong>{record.id}</strong>
+                  <span className="status-pill">{record.status}</span>
+                </div>
+                <div className="history-meta">
+                  <span>{record.date}</span>
+                  <span>{record.customer}</span>
+                </div>
+                <div className="history-numbers">
+                  <span>{record.rows.length} 行</span>
+                  <span>{cartons} CTNS</span>
+                  <strong>${amount.toFixed(2)}</strong>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {activeRecord ? (
+          <section className="table-panel history-preview">
+            <div className="panel-head">
+              <div>
+                <h2>{activeRecord.id}</h2>
+                <p>{activeRecord.customer} / {activeRecord.date}</p>
+              </div>
+              <div className="panel-actions">
+                <button className="secondary-button" type="button">预览</button>
+                <button className="primary-button" type="button">生成 Excel</button>
+              </div>
             </div>
-            <PackingTable rows={record.rows} selectedRows={[]} onUpdateRow={() => undefined} onToggleRow={() => undefined} />
+            <PackingTable rows={activeRecord.rows} selectedRows={[]} onUpdateRow={() => undefined} onToggleRow={() => undefined} />
           </section>
-        ))}
-      </div>
+        ) : (
+          <section className="empty-hint">暂无匹配的历史装箱单。</section>
+        )}
+      </section>
     </>
   );
 }
