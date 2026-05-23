@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 type PageKey = "workbench" | "history" | "stats" | "contacts";
 
@@ -70,22 +70,11 @@ type ApiImportItem = {
   };
 };
 
-const navigation: Array<{ key: PageKey; label: string }> = [
-  { key: "workbench", label: "工作台" },
-  { key: "history", label: "历史单据" },
-  { key: "stats", label: "统计查询" },
-  { key: "contacts", label: "客户通讯录" }
-];
-
-const mergeColumns: PackingCellKey[] = [
-  "photo",
-  "qtyPerCarton",
-  "cartonCount",
-  "grossWeightCtn",
-  "cbm",
-  "totalGrossWeight",
-  "measureCm",
-  "totalCbm"
+const navigation: Array<{ key: PageKey; label: string; icon: string }> = [
+  { key: "workbench", label: "工作台", icon: "▤" },
+  { key: "history", label: "历史单据", icon: "▦" },
+  { key: "stats", label: "统计查询", icon: "↥" },
+  { key: "contacts", label: "客户通讯录", icon: "☷" }
 ];
 
 const tableColumns: Array<{ key: PackingCellKey; label: string; className?: string; mergeable?: boolean; suggestible?: boolean }> = [
@@ -104,6 +93,8 @@ const tableColumns: Array<{ key: PackingCellKey; label: string; className?: stri
   { key: "measureCm", label: "箱子规格", className: "col-measure", mergeable: true },
   { key: "totalCbm", label: "总体积", className: "col-number", mergeable: true }
 ];
+
+const mergeColumns: PackingCellKey[] = ["photo", "qtyPerCarton", "cartonCount", "grossWeightCtn", "cbm", "totalGrossWeight", "measureCm", "totalCbm"];
 
 const customersSeed: Customer[] = [
   {
@@ -168,7 +159,7 @@ const historySeed: OrderRecord[] = [
     date: "2026-05-18",
     customer: "广州客户 A",
     status: "草稿",
-    rows: [row("h1", { itemName: "SEAT COVER", quantity: "80", unit: "set", unitPrice: "65", totalPrice: "5200" })]
+    rows: [row("h1", { itemName: "SEAT COVER", quantity: "80", unit: "set", unitPrice: "65", totalPrice: "5200", cartonCount: "8" })]
   }
 ];
 
@@ -204,6 +195,10 @@ function uniqueValues(rows: PackingRow[], key: "itemName" | "description"): stri
 
 function apiValue(value: string | number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
+}
+
+function isSuggestKey(key: PackingCellKey): key is "itemName" | "description" {
+  return key === "itemName" || key === "description";
 }
 
 function mapImportedOrder(item: ApiImportItem): OrderRecord {
@@ -281,7 +276,6 @@ export function App() {
 
   function mergeSelectedRows() {
     if (selectedRows.length < 2) return;
-
     const selectedIndexes = selectedRows.map((id) => rows.findIndex((item) => item.id === id)).sort((a, b) => a - b);
     const isContiguous = selectedIndexes.every((index, offset) => offset === 0 || index === selectedIndexes[offset - 1] + 1);
     if (!isContiguous) return;
@@ -341,16 +335,25 @@ export function App() {
           <div className="brand-mark">PL</div>
           <div>
             <strong>装箱单系统</strong>
-            <span>Packing List</span>
+            <span>Packing List System</span>
           </div>
         </div>
         <nav className="nav-list">
           {navigation.map((item) => (
             <button key={item.key} className={page === item.key ? "nav-item active" : "nav-item"} onClick={() => setPage(item.key)} type="button">
+              <span className="nav-icon">{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
+        <div className="sidebar-user">
+          <span>PL</span>
+          <div>
+            <strong>管理员</strong>
+            <small>Administrator</small>
+          </div>
+          <b>⌄</b>
+        </div>
       </aside>
 
       <main className="workspace">
@@ -418,18 +421,18 @@ function WorkbenchPage(props: {
 }) {
   return (
     <>
-      <PageHeader title="装箱单工作台">
-        <button className="ghost-button" type="button">保存草稿</button>
-        <button className="secondary-button" type="button">预览表格</button>
-        <button className="primary-button" type="button">生成 Excel</button>
+      <PageHeader title="装箱单工作台" subtitle="高效创建与管理装箱单">
+        <button className="secondary-button icon-button" type="button"><span>□</span>保存草稿</button>
+        <button className="secondary-button icon-button" type="button"><span>▣</span>预览表格</button>
+        <button className="primary-button icon-button" type="button"><span>◎</span>生成 Excel</button>
       </PageHeader>
 
       <section className="summary-strip">
-        <Summary label="客户" value={props.selectedCustomer || "未选择"} />
-        <Summary label="明细行" value={String(props.rows.length)} />
-        <Summary label="总数量" value={String(props.totals.quantity)} />
-        <Summary label="总金额" value={`¥${props.totals.amount.toFixed(2)}`} />
-        <Summary label="总箱数" value={String(props.totals.cartons)} />
+        <Summary icon="☷" label="客户" value={props.selectedCustomer || "未选择"} />
+        <Summary icon="♙" label="明细行" value={String(props.rows.length)} />
+        <Summary icon="□" label="总数量" value={String(props.totals.quantity)} />
+        <Summary icon="￥" label="总金额" value={`￥${props.totals.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} emphasis />
+        <Summary icon="▤" label="总箱数" value={String(props.totals.cartons)} />
       </section>
 
       <section className="form-band">
@@ -462,15 +465,15 @@ function WorkbenchPage(props: {
         <div className="table-panel">
           <div className="panel-head">
             <div>
-              <h2>明细录入</h2>
+              <h2><span className="section-marker" />明细录入</h2>
               <p>支持按 SOGO 模板合并箱规相关列；总价、总毛重、总体积改为人工确认录入。</p>
             </div>
             <div className="panel-actions">
-              <button className="secondary-button" type="button" onClick={props.onOpenDetailModal}>弹出录入</button>
+              <button className="warm-button" type="button" onClick={props.onOpenDetailModal}>弹出录入</button>
               <button className="secondary-button" type="button" onClick={props.onMergeRows}>合并选中行</button>
               <button className="ghost-button" type="button" onClick={props.onUnmergeRows}>取消合并</button>
               <button className="danger-button" type="button" onClick={props.onClearRows}>清空明细录入</button>
-              <button className="primary-button" type="button" onClick={props.onAddRow}>新增一行</button>
+              <button className="primary-button add-row-button" type="button" onClick={props.onAddRow}>＋ 新增一行</button>
             </div>
           </div>
           <PackingTable rows={props.rows} selectedRows={props.selectedRows} suggestions={props.suggestions} onUpdateRow={props.onUpdateRow} onToggleRow={props.onToggleRow} />
@@ -478,17 +481,20 @@ function WorkbenchPage(props: {
 
         <aside className="side-panel">
           <section className="panel-section">
-            <h2>照片识别</h2>
+            <div className="side-title">
+              <h2>照片识别</h2>
+              <button className="translate-button" type="button">译</button>
+            </div>
             <div
-              className={props.ocrStatus === "识别成功" ? "drag-upload success" : "drag-upload recognizing"}
+              className={props.ocrStatus === "识别成功" ? "drag-upload success" : "drag-upload"}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
                 props.onUploadOcr();
               }}
             >
-              <strong>{props.ocrStatus}</strong>
-              <span>拖拽或点击上传手写照片，支持 JPG / PNG / WebP</span>
+              <strong>☁</strong>
+              <span>拖拽或点击上传手写照片<br />支持 JPG / PNG / WebP</span>
             </div>
             <div className="ocr-progress" aria-label="照片识别进度">
               <div className="progress-row">
@@ -501,15 +507,15 @@ function WorkbenchPage(props: {
             </div>
             <label className="upload-control">
               <input type="file" accept="image/*" onChange={props.onUploadOcr} />
-              上传手写照片
+              ↑ 上传手写照片
             </label>
           </section>
 
           <section className="panel-section">
             <h2>付款信息</h2>
-            <label className="field compact">DEPOTSIT 订金<input type="number" min="0" step="0.01" placeholder="0.00" /></label>
+            <label className="field compact">DEPOSIT 订金<input type="number" min="0" step="0.01" placeholder="0.00" /></label>
             <label className="field compact">BLANCE 余额<input type="number" min="0" step="0.01" placeholder="0.00" /></label>
-            <label className="field compact">银行账号<textarea rows={4} placeholder="填写银行账户信息" /></label>
+            <label className="field compact">银行账号<input placeholder="请输入银行账号（可选）" /></label>
           </section>
         </aside>
       </section>
@@ -543,41 +549,28 @@ function PackingTable(props: {
           </tr>
         </thead>
         <tbody>
-          {props.rows.map((item, index) => {
-            const rowSpan = groupRowSpan(index, item.mergeGroupId);
-            return (
-              <tr key={item.id}>
-                <td className="select-col">
-                  <input type="checkbox" checked={props.selectedRows.includes(item.id)} onChange={() => props.onToggleRow(item.id)} />
-                </td>
-                {tableColumns.map((column) => {
-                  if (column.mergeable && item.mergeGroupId && rowSpan === 0) return null;
-                  const value = String(item[column.key] ?? "");
-                  const suggestionKey = column.key === "itemName" || column.key === "description" ? column.key : undefined;
-                  return (
-                    <td key={column.key} className={column.className} rowSpan={column.mergeable ? rowSpan : 1}>
-                      {column.key === "photo" ? (
-                        <ImageCellInput value={value} onChange={(nextValue) => props.onUpdateRow(item.id, column.key, nextValue)} />
-                      ) : column.suggestible && suggestionKey ? (
-                        <SuggestInput
-                          value={value}
-                          placeholder={column.label}
-                          suggestions={props.suggestions?.[suggestionKey] ?? []}
-                          onChange={(nextValue) => props.onUpdateRow(item.id, column.key, nextValue)}
-                        />
-                      ) : (
-                        <input
-                          value={value}
-                          onChange={(event) => props.onUpdateRow(item.id, column.key, event.target.value)}
-                          placeholder={column.label}
-                        />
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
+          {props.rows.map((item, index) => (
+            <tr key={item.id}>
+              <td className="select-col">
+                <input checked={props.selectedRows.includes(item.id)} type="checkbox" onChange={() => props.onToggleRow(item.id)} />
+              </td>
+              {tableColumns.map((column) => {
+                const span = column.mergeable ? groupRowSpan(index, item.mergeGroupId) : 1;
+                if (column.mergeable && span === 0) return null;
+                return (
+                  <td key={column.key} rowSpan={span} className={column.className}>
+                    {column.key === "photo" ? (
+                      <ImageCellInput value={item.photo} onChange={(value) => props.onUpdateRow(item.id, "photo", value)} />
+                    ) : column.suggestible && props.suggestions && isSuggestKey(column.key) ? (
+                      <SuggestInput value={item[column.key]} suggestions={props.suggestions[column.key]} placeholder={column.label} onChange={(value) => props.onUpdateRow(item.id, column.key, value)} />
+                    ) : (
+                      <input value={item[column.key]} placeholder={column.label} onChange={(event) => props.onUpdateRow(item.id, column.key, event.target.value)} />
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -585,13 +578,13 @@ function PackingTable(props: {
 }
 
 function HistoryPage({ records }: { records: OrderRecord[] }) {
-  const [importedRecords, setImportedRecords] = useState<OrderRecord[]>([]);
-  const [importMessage, setImportMessage] = useState("尚未导入 Excel 文件。");
-  const [isImporting, setIsImporting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [date, setDate] = useState("");
   const [status, setStatus] = useState("全部");
+  const [importMessage, setImportMessage] = useState("请选择 .xls 或 .xlsx 文件，系统会保存到服务器并生成待核对草稿单。");
+  const [importedRecords, setImportedRecords] = useState<OrderRecord[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [activeId, setActiveId] = useState(records[0]?.id ?? "");
   const allRecords = [...importedRecords, ...records];
   const filtered = allRecords.filter((record) => {
@@ -602,14 +595,8 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   });
   const activeRecord = filtered.find((record) => record.id === activeId) ?? filtered[0];
   const totalRows = filtered.reduce((sum, record) => sum + record.rows.length, 0);
-  const totalAmount = filtered.reduce(
-    (sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.totalPrice), 0),
-    0
-  );
-  const totalCartons = filtered.reduce(
-    (sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0),
-    0
-  );
+  const totalAmount = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.totalPrice), 0), 0);
+  const totalCartons = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0), 0);
   const importedRows = importedRecords.reduce((sum, record) => sum + record.rows.length, 0);
 
   async function handleExcelImport(fileList: FileList | null) {
@@ -665,7 +652,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
 
   return (
     <>
-      <PageHeader title="历史装箱单">
+      <PageHeader title="历史装箱单" subtitle="导入、查询并批量导出历史单据">
         <label className={isImporting ? "secondary-button file-action disabled" : "secondary-button file-action"}>
           {isImporting ? "导入中..." : "批量导入 Excel"}
           <input disabled={isImporting} type="file" accept=".xls,.xlsx" multiple onChange={(event) => handleExcelImport(event.target.files)} />
@@ -692,10 +679,10 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
       </section>
 
       <section className="history-overview">
-        <Summary label="匹配单据" value={String(filtered.length)} />
-        <Summary label="明细行" value={String(totalRows)} />
-        <Summary label="总金额" value={`$${totalAmount.toFixed(2)}`} />
-        <Summary label="总箱数" value={String(totalCartons)} />
+        <Summary icon="▦" label="匹配单据" value={String(filtered.length)} />
+        <Summary icon="♙" label="明细行" value={String(totalRows)} />
+        <Summary icon="$" label="总金额" value={`$${totalAmount.toFixed(2)}`} />
+        <Summary icon="▤" label="总箱数" value={String(totalCartons)} />
       </section>
 
       <section className="query-band history-query">
@@ -710,12 +697,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
             const amount = record.rows.reduce((sum, item) => sum + toNumber(item.totalPrice), 0);
             const cartons = record.rows.reduce((sum, item) => sum + toNumber(item.cartonCount), 0);
             return (
-              <button
-                className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"}
-                key={record.id}
-                onClick={() => setActiveId(record.id)}
-                type="button"
-              >
+              <button className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id} onClick={() => setActiveId(record.id)} type="button">
                 <div className="record-head">
                   <strong>{record.id}</strong>
                   <span className="status-pill">{record.status}</span>
@@ -789,28 +771,14 @@ function ImageCellInput(props: { value: string; onChange: (value: string) => voi
   );
 }
 
-function SuggestInput(props: {
-  value: string;
-  placeholder: string;
-  suggestions: string[];
-  onChange: (value: string) => void;
-}) {
+function SuggestInput(props: { value: string; placeholder: string; suggestions: string[]; onChange: (value: string) => void }) {
   const [focused, setFocused] = useState(false);
   const normalized = props.value.trim().toLowerCase();
-  const options = props.suggestions
-    .filter((item) => !normalized || item.toLowerCase().includes(normalized))
-    .filter((item) => item !== props.value)
-    .slice(0, 8);
+  const options = props.suggestions.filter((item) => !normalized || item.toLowerCase().includes(normalized)).filter((item) => item !== props.value).slice(0, 8);
 
   return (
     <div className="suggest-input">
-      <input
-        value={props.value}
-        onBlur={() => window.setTimeout(() => setFocused(false), 120)}
-        onChange={(event) => props.onChange(event.target.value)}
-        onFocus={() => setFocused(true)}
-        placeholder={props.placeholder}
-      />
+      <input value={props.value} onBlur={() => window.setTimeout(() => setFocused(false), 120)} onChange={(event) => props.onChange(event.target.value)} onFocus={() => setFocused(true)} placeholder={props.placeholder} />
       {focused && options.length > 0 && (
         <div className="suggest-list">
           {options.map((item) => (
@@ -842,9 +810,7 @@ function StatsPage({ records, customers }: { records: OrderRecord[]; customers: 
   const cartons = filtered.reduce((sum, item) => sum + toNumber(item.cartonCount), 0);
 
   function toggleCustomer(customerName: string) {
-    setSelectedCustomers((current) =>
-      current.includes(customerName) ? current.filter((item) => item !== customerName) : [...current, customerName]
-    );
+    setSelectedCustomers((current) => (current.includes(customerName) ? current.filter((item) => item !== customerName) : [...current, customerName]));
   }
 
   function toggleAllCustomers() {
@@ -853,7 +819,7 @@ function StatsPage({ records, customers }: { records: OrderRecord[]; customers: 
 
   return (
     <>
-      <PageHeader title="统计查询">
+      <PageHeader title="统计查询" subtitle="按客户、日期和产品快速核对历史明细">
         <button className="primary-button" type="button">统计</button>
       </PageHeader>
       <section className="query-band stats-query">
@@ -863,15 +829,9 @@ function StatsPage({ records, customers }: { records: OrderRecord[]; customers: 
         <div className="field customer-checks">
           客户
           <div className="check-grid">
-            <label className="check-item check-all">
-              <input checked={allSelected} type="checkbox" onChange={toggleAllCustomers} />
-              全选
-            </label>
+            <label className="check-item check-all"><input checked={allSelected} type="checkbox" onChange={toggleAllCustomers} />全部</label>
             {customers.map((customer) => (
-              <label key={customer.id} className="check-item">
-                <input checked={selectedCustomers.includes(customer.name)} type="checkbox" onChange={() => toggleCustomer(customer.name)} />
-                {customer.name}
-              </label>
+              <label key={customer.id} className="check-item"><input checked={selectedCustomers.includes(customer.name)} type="checkbox" onChange={() => toggleCustomer(customer.name)} />{customer.name}</label>
             ))}
           </div>
         </div>
@@ -888,11 +848,11 @@ function StatsPage({ records, customers }: { records: OrderRecord[]; customers: 
             <PackingTable rows={filtered} selectedRows={[]} onUpdateRow={() => undefined} onToggleRow={() => undefined} />
           </section>
           <section className="summary-strip">
-            <Summary label="匹配明细" value={String(filtered.length)} />
-            <Summary label="产品总数量" value={String(quantity)} />
-            <Summary label="产品总价" value={`¥${amount.toFixed(2)}`} />
-            <Summary label="总箱数" value={String(cartons)} />
-            <Summary label="区间总货款" value={`¥${amount.toFixed(2)}`} />
+            <Summary icon="▦" label="匹配明细" value={String(filtered.length)} />
+            <Summary icon="□" label="产品总数量" value={String(quantity)} />
+            <Summary icon="$" label="产品总价" value={`￥${amount.toFixed(2)}`} />
+            <Summary icon="▤" label="总箱数" value={String(cartons)} />
+            <Summary icon="￥" label="区间总货款" value={`￥${amount.toFixed(2)}`} emphasis />
           </section>
         </>
       )}
@@ -913,7 +873,7 @@ function ContactsPage({ customers, onSaveCustomer }: { customers: Customer[]; on
 
   return (
     <>
-      <PageHeader title="客户通讯录">
+      <PageHeader title="客户通讯录" subtitle="维护客户联系人、电话和收货信息">
         <button className="primary-button" type="button" onClick={submit}>保存客户</button>
       </PageHeader>
       <section className="contact-layout">
@@ -942,12 +902,7 @@ function ContactsPage({ customers, onSaveCustomer }: { customers: Customer[]; on
   );
 }
 
-function CustomerPicker(props: {
-  customers: Customer[];
-  onClose: () => void;
-  onSelect: (name: string) => void;
-  onSaveCustomer: (customer: Customer) => void;
-}) {
+function CustomerPicker(props: { customers: Customer[]; onClose: () => void; onSelect: (name: string) => void; onSaveCustomer: (customer: Customer) => void }) {
   const [draft, setDraft] = useState<Customer>({ id: "", name: "", contact: "", phone: "", email: "", address: "" });
 
   function save() {
@@ -998,7 +953,7 @@ function ResizableDetailModal(props: {
         <div className="modal-head">
           <h2>弹出明细录入</h2>
           <div className="panel-actions">
-            <button className="secondary-button" type="button" onClick={props.onAddRow}>新增一行</button>
+            <button className="primary-button" type="button" onClick={props.onAddRow}>新增一行</button>
             <button className="danger-button" type="button" onClick={props.onClearRows}>清空明细录入</button>
             <button className="ghost-button" type="button" onClick={props.onClose}>关闭</button>
           </div>
@@ -1009,20 +964,24 @@ function ResizableDetailModal(props: {
   );
 }
 
-function PageHeader({ title, children }: { title: string; children?: React.ReactNode }) {
+function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
     <header className="topbar">
-      <h1>{title}</h1>
+      <div>
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
       <div className="top-actions">{children}</div>
     </header>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({ icon, label, value, emphasis }: { icon: string; label: string; value: string; emphasis?: boolean }) {
   return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="summary-card">
+      <span className="summary-icon">{icon}</span>
+      <p>{label}</p>
+      <strong className={emphasis ? "money" : undefined}>{value}</strong>
     </div>
   );
 }
