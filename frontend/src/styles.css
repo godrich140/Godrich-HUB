@@ -40,6 +40,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
@@ -625,6 +630,51 @@ textarea:focus {
   display: none;
 }
 
+.file-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.file-action.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.file-action input {
+  display: none;
+}
+
+.import-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 130px;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 14px;
+  background: #eff6ff;
+}
+
+.import-panel div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.import-panel strong {
+  overflow: hidden;
+  color: var(--accent-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-panel span {
+  color: #475569;
+  font-size: 12px;
+}
+
 .record-list {
   display: grid;
   gap: 14px;
@@ -888,6 +938,10 @@ textarea:focus {
 
   .summary-strip,
   .history-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .import-panel {
     grid-template-columns: 1fr;
   }
 

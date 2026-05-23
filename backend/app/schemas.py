@@ -119,6 +119,49 @@ class FileAssetRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ExcelImportResult(BaseModel):
+    file: FileAssetRead
+    order: PackingOrderRead
+
+
+class ExcelImportResponse(BaseModel):
+    imported: list[ExcelImportResult]
+
+
+class ExportPackingRow(BaseModel):
+    itemName: str = ""
+    description: str = ""
+    photo: str = ""
+    quantity: str = ""
+    unit: str = ""
+    unitPrice: str = ""
+    totalPrice: str = ""
+    qtyPerCarton: str = ""
+    cartonCount: str = ""
+    grossWeightCtn: str = ""
+    cbm: str = ""
+    totalGrossWeight: str = ""
+    measureCm: str = ""
+    totalCbm: str = ""
+
+
+class ExportOrderRecord(BaseModel):
+    id: str
+    date: str
+    customer: str
+    status: str
+    rows: list[ExportPackingRow] = []
+
+
+class ExcelExportRequest(BaseModel):
+    records: list[ExportOrderRecord]
+
+
+class ExcelExportResponse(BaseModel):
+    file: FileAssetRead
+    download_url: str
+
+
 class OcrAnalyzeRequest(BaseModel):
     file_id: uuid.UUID
     order_id: uuid.UUID | None = None

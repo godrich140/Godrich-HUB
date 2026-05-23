@@ -40,6 +40,36 @@ type OrderRecord = {
   rows: PackingRow[];
 };
 
+type ApiImportItem = {
+  file: {
+    original_name: string;
+    storage_path: string;
+  };
+  order: {
+    order_no: string;
+    customer_name: string;
+    order_date: string;
+    status: string;
+    items: Array<{
+      id: string;
+      item_name: string | null;
+      description: string | null;
+      quantity: string | number | null;
+      unit: string | null;
+      unit_price: string | number | null;
+      total_price: string | number | null;
+      qty_per_carton: string | number | null;
+      carton_count: string | number | null;
+      gross_weight_ctn: string | number | null;
+      cbm: string | number | null;
+      total_gross_weight: string | number | null;
+      measure_cm: string | null;
+      total_cbm: string | number | null;
+      merge_group_id: string | null;
+    }>;
+  };
+};
+
 const navigation: Array<{ key: PageKey; label: string }> = [
   { key: "workbench", label: "工作台" },
   { key: "history", label: "历史单据" },
@@ -170,6 +200,37 @@ function toNumber(value: string): number {
 
 function uniqueValues(rows: PackingRow[], key: "itemName" | "description"): string[] {
   return Array.from(new Set(rows.map((item) => item[key].trim()).filter(Boolean)));
+}
+
+function apiValue(value: string | number | null | undefined): string {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function mapImportedOrder(item: ApiImportItem): OrderRecord {
+  return {
+    id: item.order.order_no,
+    date: item.order.order_date,
+    customer: item.order.customer_name,
+    status: item.order.status === "draft" ? "草稿" : item.order.status,
+    rows: item.order.items.map((detail) =>
+      row(detail.id, {
+        itemName: apiValue(detail.item_name),
+        description: apiValue(detail.description),
+        quantity: apiValue(detail.quantity),
+        unit: apiValue(detail.unit),
+        unitPrice: apiValue(detail.unit_price),
+        totalPrice: apiValue(detail.total_price),
+        qtyPerCarton: apiValue(detail.qty_per_carton),
+        cartonCount: apiValue(detail.carton_count),
+        grossWeightCtn: apiValue(detail.gross_weight_ctn),
+        cbm: apiValue(detail.cbm),
+        totalGrossWeight: apiValue(detail.total_gross_weight),
+        measureCm: apiValue(detail.measure_cm),
+        totalCbm: apiValue(detail.total_cbm),
+        mergeGroupId: detail.merge_group_id || undefined
+      })
+    )
+  };
 }
 
 export function App() {
@@ -524,11 +585,16 @@ function PackingTable(props: {
 }
 
 function HistoryPage({ records }: { records: OrderRecord[] }) {
+  const [importedRecords, setImportedRecords] = useState<OrderRecord[]>([]);
+  const [importMessage, setImportMessage] = useState("尚未导入 Excel 文件。");
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [date, setDate] = useState("");
   const [status, setStatus] = useState("全部");
   const [activeId, setActiveId] = useState(records[0]?.id ?? "");
-  const filtered = records.filter((record) => {
+  const allRecords = [...importedRecords, ...records];
+  const filtered = allRecords.filter((record) => {
     const matchKeyword = !keyword || `${record.id}${record.customer}`.toLowerCase().includes(keyword.toLowerCase());
     const matchDate = !date || record.date === date;
     const matchStatus = status === "全部" || record.status === status;
@@ -544,13 +610,86 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
     (sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0),
     0
   );
+  const importedRows = importedRecords.reduce((sum, record) => sum + record.rows.length, 0);
+
+  async function handleExcelImport(fileList: FileList | null) {
+    const files = Array.from(fileList ?? []);
+    if (files.length === 0) return;
+
+    const excelFiles = files.filter((file) => /\.(xlsx|xls)$/i.test(file.name));
+    if (excelFiles.length === 0) {
+      setImportMessage("未识别到 .xls 或 .xlsx 文件，请重新选择。");
+      return;
+    }
+
+    setIsImporting(true);
+    setImportMessage("正在上传 Excel 到服务器...");
+    try {
+      const formData = new FormData();
+      excelFiles.forEach((file) => formData.append("files", file));
+      const response = await fetch("/api/excel/import-history", { method: "POST", body: formData });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { imported: ApiImportItem[] };
+      const nextRecords = payload.imported.map(mapImportedOrder);
+      setImportedRecords((current) => [...nextRecords, ...current]);
+      setActiveId(nextRecords[0]?.id ?? activeId);
+      setKeyword("");
+      setDate("");
+      setStatus("全部");
+      setImportMessage(`服务器已保存 ${payload.imported.length} 个 Excel 文件，并生成 ${nextRecords.length} 张待核对草稿单。`);
+    } catch (error) {
+      setImportMessage(`Excel 导入失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
+  async function handleBatchExport() {
+    if (filtered.length === 0) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch("/api/excel/export-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records: filtered })
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { download_url: string };
+      window.location.href = payload.download_url;
+    } catch (error) {
+      setImportMessage(`批量导出失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <>
       <PageHeader title="历史装箱单">
-        <button className="secondary-button" type="button">批量导出</button>
+        <label className={isImporting ? "secondary-button file-action disabled" : "secondary-button file-action"}>
+          {isImporting ? "导入中..." : "批量导入 Excel"}
+          <input disabled={isImporting} type="file" accept=".xls,.xlsx" multiple onChange={(event) => handleExcelImport(event.target.files)} />
+        </label>
+        <button className="secondary-button" type="button" onClick={handleBatchExport} disabled={filtered.length === 0 || isExporting}>
+          {isExporting ? "导出中..." : "批量导出"}
+        </button>
         <button className="primary-button" type="button">新建装箱单</button>
       </PageHeader>
+
+      <section className="import-panel">
+        <div>
+          <strong>Excel 批量导入</strong>
+          <span>{importMessage}</span>
+        </div>
+        <div>
+          <strong>{importedRecords.length}</strong>
+          <span>导入单据</span>
+        </div>
+        <div>
+          <strong>{importedRows}</strong>
+          <span>导入明细</span>
+        </div>
+      </section>
 
       <section className="history-overview">
         <Summary label="匹配单据" value={String(filtered.length)} />

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import customers, files, ocr, orders, stats
+from app.routers import customers, excel, files, ocr, orders, stats
 
 
 settings = get_settings()
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(customers.router, prefix=settings.api_prefix)
     app.include_router(orders.router, prefix=settings.api_prefix)
     app.include_router(files.router, prefix=settings.api_prefix)
+    app.include_router(excel.router, prefix=settings.api_prefix)
     app.include_router(ocr.router, prefix=settings.api_prefix)
     app.include_router(stats.router, prefix=settings.api_prefix)
     return app
