@@ -428,7 +428,7 @@ textarea:focus {
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
 }
 
@@ -455,6 +455,21 @@ textarea:focus {
   justify-content: space-between;
   gap: 12px;
   padding: 20px 22px;
+}
+
+.panel-head .panel-actions {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.panel-head .primary-button,
+.panel-head .secondary-button,
+.panel-head .ghost-button,
+.panel-head .danger-button,
+.panel-head .warm-button {
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 14px;
 }
 
 .panel-head {
@@ -659,7 +674,7 @@ textarea:focus {
 
 .panel-section,
 .form-panel {
-  padding: 20px;
+  padding: 16px;
 }
 
 .side-title {
@@ -682,10 +697,10 @@ textarea:focus {
 
 .drag-upload {
   display: grid;
-  min-height: 136px;
+  min-height: 104px;
   place-items: center;
-  gap: 10px;
-  margin: 16px 0 12px;
+  gap: 6px;
+  margin: 12px 0 10px;
   border: 1px dashed #b9c6da;
   border-radius: 8px;
   background: linear-gradient(180deg, #fbfdff, #f7faff);
@@ -695,7 +710,7 @@ textarea:focus {
 
 .drag-upload strong {
   color: #788aa5;
-  font-size: 32px;
+  font-size: 26px;
 }
 
 .drag-upload.success {
