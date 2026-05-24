@@ -6,8 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
+from app.excel_templates import export_order_to_xls, render_order_preview
 from app.models import PackingItem, PackingOrder
-from app.schemas import PackingOrderCreate, PackingOrderRead, PackingOrderUpdate
+from app.schemas import ExcelExportResponse, OrderPreviewResponse, PackingOrderCreate, PackingOrderRead, PackingOrderUpdate
 
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -66,3 +67,16 @@ def update_order(order_id: uuid.UUID, payload: PackingOrderUpdate, db: Session =
 
     db.commit()
     return get_order(order.id, db)
+
+
+@router.post("/{order_id}/preview", response_model=OrderPreviewResponse)
+def preview_order(order_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderPreviewResponse:
+    order = get_order(order_id, db)
+    return OrderPreviewResponse(html=render_order_preview(order))
+
+
+@router.post("/{order_id}/export-excel", response_model=ExcelExportResponse)
+def export_order_excel(order_id: uuid.UUID, db: Session = Depends(get_db)) -> ExcelExportResponse:
+    order = get_order(order_id, db)
+    asset, download_url = export_order_to_xls(db, order)
+    return ExcelExportResponse(file=asset, download_url=download_url)

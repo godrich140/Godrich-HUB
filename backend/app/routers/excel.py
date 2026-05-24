@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
 from app.database import get_db
+from app.excel_templates import export_imported_files_zip
 from app.models import FileAsset, PackingItem, PackingOrder
-from app.schemas import ExcelExportRequest, ExcelExportResponse, ExcelImportResponse
+from app.schemas import ExcelExportRequest, ExcelExportResponse, ExcelImportResponse, HistoryFileExportRequest
 from app.services import save_upload
 
 
@@ -134,6 +135,25 @@ def export_history_excel(payload: ExcelExportRequest, db: Session = Depends(get_
     db.commit()
     db.refresh(asset)
     return ExcelExportResponse(file=asset, download_url=f"/api/excel/download/{asset.id}")
+
+
+@router.post("/export-history-files", response_model=ExcelExportResponse)
+def export_history_files(payload: HistoryFileExportRequest, db: Session = Depends(get_db)) -> ExcelExportResponse:
+    if not payload.file_ids:
+        raise HTTPException(status_code=400, detail="No files selected")
+
+    assets = list(db.scalars(select(FileAsset).where(FileAsset.id.in_(payload.file_ids))))
+    found_ids = {asset.id for asset in assets}
+    missing = [file_id for file_id in payload.file_ids if file_id not in found_ids]
+    if missing:
+        raise HTTPException(status_code=404, detail="Some Excel files were not found")
+
+    invalid = [asset.original_name for asset in assets if asset.file_type != "excel_imports"]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Only imported Excel files can be packed: {', '.join(invalid)}")
+
+    asset, download_url = export_imported_files_zip(db, assets)
+    return ExcelExportResponse(file=asset, download_url=download_url)
 
 
 @router.get("/download/{file_id}")

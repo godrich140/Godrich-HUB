@@ -162,6 +162,14 @@ class ExcelExportResponse(BaseModel):
     download_url: str
 
 
+class OrderPreviewResponse(BaseModel):
+    html: str
+
+
+class HistoryFileExportRequest(BaseModel):
+    file_ids: list[uuid.UUID]
+
+
 class OcrAnalyzeRequest(BaseModel):
     file_id: uuid.UUID
     order_id: uuid.UUID | None = None

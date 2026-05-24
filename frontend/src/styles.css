@@ -1109,3 +1109,709 @@ textarea:focus {
     width: 96vw;
   }
 }
+
+/* Apple UI refresh */
+:root {
+  --app-bg: #f5f5f7;
+  --app-surface: #ffffff;
+  --app-surface-muted: #fbfbfd;
+  --app-text: #1d1d1f;
+  --app-muted: #6e6e73;
+  --app-border: #d2d2d7;
+  --app-border-soft: #e5e5ea;
+  --app-blue: #0071e3;
+  --app-blue-hover: #0077ed;
+  --app-blue-soft: rgba(0, 113, 227, 0.1);
+  --app-green: #34c759;
+  --app-danger: #ff3b30;
+  --app-radius: 18px;
+  --app-control-radius: 980px;
+  --app-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.app-shell {
+  grid-template-columns: 232px minmax(0, 1fr);
+  background: var(--app-bg);
+}
+
+.sidebar {
+  border-right: 1px solid var(--app-border-soft);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--app-text);
+  box-shadow: none;
+  backdrop-filter: blur(18px);
+}
+
+.brand {
+  border-bottom-color: var(--app-border-soft);
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: #e8e8ed;
+  color: var(--app-text);
+  font-size: 14px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.brand strong {
+  color: var(--app-text);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.brand span,
+.sidebar-user small {
+  color: var(--app-muted);
+}
+
+.nav-list {
+  gap: 4px;
+  margin-top: 14px;
+}
+
+.nav-item {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--app-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nav-item.active,
+.nav-item:hover {
+  background: var(--app-blue-soft);
+  color: var(--app-blue);
+  box-shadow: none;
+}
+
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 0;
+  color: currentColor;
+}
+
+.sidebar-user {
+  border-top-color: var(--app-border-soft);
+}
+
+.sidebar-user > span {
+  width: 34px;
+  height: 34px;
+  background: #e8e8ed;
+  color: var(--app-text);
+  font-size: 12px;
+}
+
+.sidebar-user strong,
+.sidebar-user b {
+  color: var(--app-text);
+}
+
+.workspace {
+  padding: 24px 28px 42px;
+}
+
+.topbar {
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+h1 {
+  color: var(--app-text);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.topbar p {
+  color: var(--app-muted);
+  font-size: 14px;
+}
+
+.save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  border-radius: var(--app-control-radius);
+  padding: 3px 9px;
+  background: rgba(52, 199, 89, 0.12);
+  color: #21863d;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.danger-button,
+.warm-button,
+.upload-control {
+  min-height: 40px;
+  border-radius: var(--app-control-radius);
+  padding: 8px 17px;
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, transform 120ms ease;
+}
+
+.primary-button:active,
+.secondary-button:active,
+.ghost-button:active,
+.danger-button:active,
+.warm-button:active {
+  transform: scale(0.99);
+}
+
+.primary-button {
+  border-color: var(--app-blue);
+  background: var(--app-blue);
+  color: #fff;
+}
+
+.primary-button:hover {
+  background: var(--app-blue-hover);
+}
+
+.secondary-button,
+.ghost-button,
+.warm-button {
+  border-color: transparent;
+  background: #e8e8ed;
+  color: var(--app-text);
+}
+
+.secondary-button:hover,
+.ghost-button:hover,
+.warm-button:hover {
+  background: #dedee3;
+  border-color: transparent;
+}
+
+.danger-button {
+  border-color: transparent;
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--app-danger);
+}
+
+.icon-button {
+  gap: 7px;
+}
+
+.summary-strip,
+.history-overview {
+  gap: 12px;
+  margin: 8px 0 16px;
+}
+
+.summary-card {
+  min-height: 88px;
+  border-color: var(--app-border-soft);
+  border-radius: var(--app-radius);
+  padding: 17px 46px 15px 18px;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.summary-card::after {
+  content: none;
+}
+
+.summary-icon {
+  right: 12px;
+  left: auto;
+  top: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #f2f2f7;
+  color: var(--app-muted);
+  box-shadow: none;
+}
+
+.summary-card p {
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.summary-card strong {
+  margin-top: 7px;
+  color: var(--app-text);
+  font-size: 24px;
+  font-weight: 650;
+}
+
+.summary-card strong.money {
+  color: var(--app-blue);
+  font-size: 20px;
+}
+
+.form-band,
+.query-band,
+.import-panel,
+.table-panel,
+.panel-section,
+.form-panel,
+.record-card,
+.modal {
+  border-color: var(--app-border-soft);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.form-band,
+.query-band,
+.import-panel {
+  padding: 16px;
+}
+
+.field {
+  color: var(--app-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+input,
+select,
+textarea {
+  border-color: var(--app-border-soft);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+}
+
+input,
+select {
+  min-height: 40px;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--app-border);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--app-blue);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.16);
+}
+
+.content-grid {
+  grid-template-columns: minmax(0, 1fr) 324px;
+  gap: 14px;
+}
+
+.panel-head,
+.modal-head {
+  padding: 16px 18px;
+  border-bottom-color: var(--app-border-soft);
+  background: var(--app-surface);
+}
+
+.panel-head h2,
+h2 {
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.section-marker {
+  width: 4px;
+  height: 18px;
+  background: var(--app-blue);
+}
+
+.panel-head p {
+  color: var(--app-muted);
+}
+
+.panel-head .primary-button,
+.panel-head .secondary-button,
+.panel-head .ghost-button,
+.panel-head .danger-button,
+.panel-head .warm-button {
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.desktop-table-wrap {
+  background: var(--app-surface);
+}
+
+.packing-table {
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.packing-table th,
+.packing-table td {
+  border-right-color: var(--app-border-soft);
+  border-bottom-color: var(--app-border-soft);
+}
+
+.packing-table th {
+  height: 44px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  font-weight: 650;
+}
+
+.packing-table td {
+  height: 50px;
+}
+
+.packing-table tbody tr:hover td {
+  background: #f7f7fa;
+}
+
+.packing-table input {
+  border-radius: 9px;
+  color: var(--app-text);
+}
+
+.packing-table input:hover,
+.packing-table input:focus {
+  border-color: var(--app-blue);
+  background: #fff;
+}
+
+.select-col input {
+  accent-color: var(--app-blue);
+}
+
+.image-cell,
+.drag-upload {
+  border-color: var(--app-border);
+  border-radius: 14px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+}
+
+.image-cell.dragging {
+  border-color: var(--app-blue);
+  background: rgba(0, 113, 227, 0.06);
+}
+
+.side-panel {
+  gap: 14px;
+}
+
+.panel-section,
+.form-panel {
+  padding: 16px;
+}
+
+.drag-upload.success {
+  border-color: rgba(52, 199, 89, 0.45);
+  background: rgba(52, 199, 89, 0.08);
+  color: #21863d;
+}
+
+.progress-row {
+  color: var(--app-text);
+}
+
+.progress-row strong {
+  color: var(--app-blue);
+}
+
+.progress-track {
+  background: #e8e8ed;
+}
+
+.progress-track span {
+  background: var(--app-blue);
+}
+
+.upload-control {
+  width: 100%;
+  border-color: var(--app-blue);
+  background: var(--app-blue);
+  color: #fff;
+}
+
+.import-panel {
+  background: var(--app-surface);
+}
+
+.import-panel strong {
+  color: var(--app-text);
+}
+
+.import-panel span,
+.history-meta,
+.history-numbers,
+.muted-text,
+.customer-list span {
+  color: var(--app-muted);
+}
+
+.history-card.active {
+  border-color: rgba(0, 113, 227, 0.32);
+  background: rgba(0, 113, 227, 0.06);
+  box-shadow: var(--app-shadow);
+}
+
+.status-pill,
+.check-all {
+  border-color: transparent;
+  background: var(--app-blue-soft);
+  color: var(--app-blue);
+}
+
+.customer-list button {
+  border-color: var(--app-border-soft);
+  border-radius: 14px;
+}
+
+.customer-list button:hover {
+  border-color: rgba(0, 113, 227, 0.35);
+  background: rgba(0, 113, 227, 0.05);
+}
+
+.empty-hint {
+  border-color: var(--app-border);
+  border-radius: var(--app-radius);
+  color: var(--app-muted);
+}
+
+.action-message {
+  margin: -4px 0 14px;
+  border: 1px solid rgba(0, 113, 227, 0.18);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: rgba(0, 113, 227, 0.06);
+  color: var(--app-blue);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.history-select {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  color: var(--app-text);
+}
+
+.history-select.disabled {
+  opacity: 0.55;
+}
+
+.history-select input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  accent-color: var(--app-blue);
+}
+
+.history-card-button {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.source-file-name {
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-modal {
+  width: min(1180px, 96vw);
+}
+
+.preview-body {
+  overflow: auto;
+  padding: 18px;
+}
+
+.excel-preview-doc {
+  min-width: 980px;
+  color: var(--app-text);
+}
+
+.excel-preview-doc h2 {
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.excel-preview-doc > p {
+  margin-bottom: 8px;
+  color: var(--app-muted);
+  text-align: center;
+}
+
+.excel-preview-meta,
+.excel-preview-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--app-border-soft);
+  padding: 10px;
+  font-weight: 650;
+}
+
+.excel-preview-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.excel-preview-doc th,
+.excel-preview-doc td {
+  border: 1px solid var(--app-border-soft);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.excel-preview-doc th {
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  font-weight: 650;
+}
+
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.modal {
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.18);
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    gap: 12px;
+    overflow: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border-soft);
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .brand strong,
+  .brand span {
+    max-width: 118px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-list {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    gap: 6px;
+    margin-top: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    flex: 0 0 auto;
+    min-height: 38px;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .sidebar-user {
+    display: none;
+  }
+
+  .content-grid,
+  .contact-layout,
+  .customer-picker-grid,
+  .history-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace {
+    padding: 16px;
+  }
+
+  .topbar {
+    align-items: stretch;
+  }
+
+  .title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  h1 {
+    font-size: 25px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .ghost-button,
+  .danger-button,
+  .warm-button,
+  .upload-control {
+    justify-content: center;
+    width: 100%;
+  }
+}

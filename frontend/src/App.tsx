@@ -1,4 +1,20 @@
 import { useMemo, useState, type ReactNode } from "react";
+import {
+  Boxes,
+  ChartNoAxesCombined,
+  Contact,
+  DollarSign,
+  Eye,
+  FileSpreadsheet,
+  Files,
+  Hash,
+  LayoutDashboard,
+  PackageCheck,
+  Rows3,
+  Save,
+  UserRound,
+  type LucideIcon
+} from "lucide-react";
 
 type PageKey = "workbench" | "history" | "stats" | "contacts";
 
@@ -33,6 +49,9 @@ type PackingRow = {
 type PackingCellKey = Exclude<keyof PackingRow, "id" | "mergeGroupId">;
 
 type OrderRecord = {
+  backendId?: string;
+  sourceFileId?: string;
+  sourceFileName?: string;
   id: string;
   date: string;
   customer: string;
@@ -42,10 +61,12 @@ type OrderRecord = {
 
 type ApiImportItem = {
   file: {
+    id: string;
     original_name: string;
     storage_path: string;
   };
   order: {
+    id: string;
     order_no: string;
     customer_name: string;
     order_date: string;
@@ -70,11 +91,11 @@ type ApiImportItem = {
   };
 };
 
-const navigation: Array<{ key: PageKey; label: string; icon: string }> = [
-  { key: "workbench", label: "工作台", icon: "▤" },
-  { key: "history", label: "历史单据", icon: "▦" },
-  { key: "stats", label: "统计查询", icon: "↥" },
-  { key: "contacts", label: "客户通讯录", icon: "☷" }
+const navigation: Array<{ key: PageKey; label: string; icon: LucideIcon }> = [
+  { key: "workbench", label: "工作台", icon: LayoutDashboard },
+  { key: "history", label: "历史单据", icon: Files },
+  { key: "stats", label: "统计查询", icon: ChartNoAxesCombined },
+  { key: "contacts", label: "客户通讯录", icon: Contact }
 ];
 
 const tableColumns: Array<{ key: PackingCellKey; label: string; className?: string; mergeable?: boolean; suggestible?: boolean }> = [
@@ -203,6 +224,9 @@ function isSuggestKey(key: PackingCellKey): key is "itemName" | "description" {
 
 function mapImportedOrder(item: ApiImportItem): OrderRecord {
   return {
+    backendId: item.order.id,
+    sourceFileId: item.file.id,
+    sourceFileName: item.file.original_name,
     id: item.order.order_no,
     date: item.order.order_date,
     customer: item.order.customer_name,
@@ -228,10 +252,66 @@ function mapImportedOrder(item: ApiImportItem): OrderRecord {
   };
 }
 
+function toApiDecimal(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function orderToApiPayload(order: {
+  orderNo: string;
+  customerName: string;
+  orderDate: string;
+  status: string;
+  deposit: string;
+  balance: string;
+  bankAccount: string;
+  rows: PackingRow[];
+}) {
+  return {
+    order_no: order.orderNo,
+    customer_name: order.customerName,
+    order_date: order.orderDate,
+    status: order.status,
+    deposit: toApiDecimal(order.deposit),
+    balance: toApiDecimal(order.balance),
+    bank_account: order.bankAccount || null,
+    items: order.rows.map((item, index) => ({
+      row_index: index + 1,
+      item_name: item.itemName || null,
+      description: item.description || null,
+      quantity: toApiDecimal(item.quantity),
+      unit: item.unit || null,
+      unit_price: toApiDecimal(item.unitPrice),
+      total_price: toApiDecimal(item.totalPrice),
+      qty_per_carton: toApiDecimal(item.qtyPerCarton),
+      carton_count: toApiDecimal(item.cartonCount),
+      gross_weight_ctn: toApiDecimal(item.grossWeightCtn),
+      cbm: toApiDecimal(item.cbm),
+      total_gross_weight: toApiDecimal(item.totalGrossWeight),
+      measure_cm: item.measureCm || null,
+      total_cbm: toApiDecimal(item.totalCbm),
+      merge_group_id: item.mergeGroupId || null
+    }))
+  };
+}
+
 export function App() {
   const [page, setPage] = useState<PageKey>("workbench");
   const [customers, setCustomers] = useState(customersSeed);
   const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [orderDate, setOrderDate] = useState("2025-10-12");
+  const [orderNo, setOrderNo] = useState(`PK${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-001`);
+  const [orderStatus, setOrderStatus] = useState("草稿");
+  const [deposit, setDeposit] = useState("");
+  const [balance, setBalance] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [rows, setRows] = useState(initialRows);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [ocrStatus, setOcrStatus] = useState("未识别");
@@ -307,6 +387,70 @@ export function App() {
     setCustomerModalOpen(false);
   }
 
+  async function saveCurrentOrder() {
+    const customerName = selectedCustomer.trim() || "未选择客户";
+    const payload = orderToApiPayload({
+      orderNo: orderNo.trim() || `PK${Date.now()}`,
+      customerName,
+      orderDate,
+      status: orderStatus === "草稿" ? "draft" : orderStatus,
+      deposit,
+      balance,
+      bankAccount,
+      rows
+    });
+
+    setIsSavingOrder(true);
+    setActionMessage("正在保存草稿...");
+    try {
+      const response = await fetch(activeOrderId ? `/api/orders/${activeOrderId}` : "/api/orders", {
+        method: activeOrderId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const saved = (await response.json()) as { id: string; order_no: string };
+      setActiveOrderId(saved.id);
+      setOrderNo(saved.order_no);
+      setActionMessage("草稿已保存到后端。");
+      return saved.id;
+    } catch (error) {
+      setActionMessage(`保存失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+      throw error;
+    } finally {
+      setIsSavingOrder(false);
+    }
+  }
+
+  async function previewCurrentOrder() {
+    try {
+      const orderId = await saveCurrentOrder();
+      setActionMessage("正在生成预览...");
+      const response = await fetch(`/api/orders/${orderId}/preview`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { html: string };
+      setPreviewHtml(payload.html);
+      setPreviewOpen(true);
+      setActionMessage("预览已生成。");
+    } catch (error) {
+      setActionMessage(`预览失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    }
+  }
+
+  async function exportCurrentOrder() {
+    try {
+      const orderId = await saveCurrentOrder();
+      setActionMessage("正在生成 Excel...");
+      const response = await fetch(`/api/orders/${orderId}/export-excel`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { download_url: string };
+      setActionMessage("Excel 已生成并保存到后端。");
+      window.location.href = payload.download_url;
+    } catch (error) {
+      setActionMessage(`生成 Excel 失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    }
+  }
+
   function handleUploadOcr() {
     setOcrStatus("识别中");
     setOcrProgress(68);
@@ -339,12 +483,15 @@ export function App() {
           </div>
         </div>
         <nav className="nav-list">
-          {navigation.map((item) => (
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            return (
             <button key={item.key} className={page === item.key ? "nav-item active" : "nav-item"} onClick={() => setPage(item.key)} type="button">
-              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-icon"><Icon aria-hidden="true" size={18} strokeWidth={2} /></span>
               {item.label}
             </button>
-          ))}
+            );
+          })}
         </nav>
         <div className="sidebar-user">
           <span>PL</span>
@@ -362,11 +509,25 @@ export function App() {
             customers={customers}
             selectedCustomer={selectedCustomer}
             setSelectedCustomer={setSelectedCustomer}
+            orderDate={orderDate}
+            setOrderDate={setOrderDate}
+            orderNo={orderNo}
+            setOrderNo={setOrderNo}
+            orderStatus={orderStatus}
+            setOrderStatus={setOrderStatus}
+            deposit={deposit}
+            setDeposit={setDeposit}
+            balance={balance}
+            setBalance={setBalance}
+            bankAccount={bankAccount}
+            setBankAccount={setBankAccount}
             rows={rows}
             selectedRows={selectedRows}
             totals={totals}
             ocrStatus={ocrStatus}
             ocrProgress={ocrProgress}
+            actionMessage={actionMessage}
+            isSavingOrder={isSavingOrder}
             onAddRow={addRow}
             onUpdateRow={updateRow}
             onToggleRow={toggleSelectedRow}
@@ -374,6 +535,9 @@ export function App() {
             onUnmergeRows={unmergeSelectedRows}
             onUploadOcr={handleUploadOcr}
             onClearRows={clearRows}
+            onSaveOrder={saveCurrentOrder}
+            onPreviewOrder={previewCurrentOrder}
+            onExportOrder={exportCurrentOrder}
             suggestions={suggestions}
             onOpenCustomerModal={() => setCustomerModalOpen(true)}
             onOpenDetailModal={() => setDetailModalOpen(true)}
@@ -385,6 +549,7 @@ export function App() {
       </main>
 
       {customerModalOpen && <CustomerPicker customers={customers} onClose={() => setCustomerModalOpen(false)} onSelect={setSelectedCustomer} onSaveCustomer={saveCustomer} />}
+      {previewOpen && <PreviewModal html={previewHtml} onClose={() => setPreviewOpen(false)} />}
       {detailModalOpen && (
         <ResizableDetailModal
           rows={rows}
@@ -403,11 +568,25 @@ function WorkbenchPage(props: {
   customers: Customer[];
   selectedCustomer: string;
   setSelectedCustomer: (value: string) => void;
+  orderDate: string;
+  setOrderDate: (value: string) => void;
+  orderNo: string;
+  setOrderNo: (value: string) => void;
+  orderStatus: string;
+  setOrderStatus: (value: string) => void;
+  deposit: string;
+  setDeposit: (value: string) => void;
+  balance: string;
+  setBalance: (value: string) => void;
+  bankAccount: string;
+  setBankAccount: (value: string) => void;
   rows: PackingRow[];
   selectedRows: string[];
   totals: { quantity: number; amount: number; cartons: number };
   ocrStatus: string;
   ocrProgress: number;
+  actionMessage: string;
+  isSavingOrder: boolean;
   onAddRow: () => void;
   onUpdateRow: (rowId: string, key: PackingCellKey, value: string) => void;
   onToggleRow: (rowId: string) => void;
@@ -415,6 +594,9 @@ function WorkbenchPage(props: {
   onUnmergeRows: () => void;
   onUploadOcr: () => void;
   onClearRows: () => void;
+  onSaveOrder: () => Promise<string>;
+  onPreviewOrder: () => void;
+  onExportOrder: () => void;
   suggestions: Record<"itemName" | "description", string[]>;
   onOpenCustomerModal: () => void;
   onOpenDetailModal: () => void;
@@ -422,17 +604,18 @@ function WorkbenchPage(props: {
   return (
     <>
       <PageHeader title="装箱单工作台" subtitle="高效创建与管理装箱单">
-        <button className="secondary-button icon-button" type="button"><span>□</span>保存草稿</button>
-        <button className="secondary-button icon-button" type="button"><span>▣</span>预览表格</button>
-        <button className="primary-button icon-button" type="button"><span>◎</span>生成 Excel</button>
+        <button className="secondary-button icon-button" type="button" onClick={() => void props.onSaveOrder()} disabled={props.isSavingOrder}><Save aria-hidden="true" size={17} />{props.isSavingOrder ? "保存中..." : "保存草稿"}</button>
+        <button className="secondary-button icon-button" type="button" onClick={props.onPreviewOrder} disabled={props.isSavingOrder}><Eye aria-hidden="true" size={17} />预览表格</button>
+        <button className="primary-button icon-button" type="button" onClick={props.onExportOrder} disabled={props.isSavingOrder}><FileSpreadsheet aria-hidden="true" size={17} />生成 Excel</button>
       </PageHeader>
+      {props.actionMessage && <section className="action-message">{props.actionMessage}</section>}
 
       <section className="summary-strip">
-        <Summary icon="☷" label="客户" value={props.selectedCustomer || "未选择"} />
-        <Summary icon="♙" label="明细行" value={String(props.rows.length)} />
-        <Summary icon="□" label="总数量" value={String(props.totals.quantity)} />
-        <Summary icon="￥" label="总金额" value={`￥${props.totals.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} emphasis />
-        <Summary icon="▤" label="总箱数" value={String(props.totals.cartons)} />
+        <Summary icon={<UserRound aria-hidden="true" size={18} />} label="客户" value={props.selectedCustomer || "未选择"} />
+        <Summary icon={<Rows3 aria-hidden="true" size={18} />} label="明细行" value={String(props.rows.length)} />
+        <Summary icon={<Hash aria-hidden="true" size={18} />} label="总数量" value={String(props.totals.quantity)} />
+        <Summary icon={<DollarSign aria-hidden="true" size={18} />} label="总金额" value={`￥${props.totals.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} emphasis />
+        <Summary icon={<Boxes aria-hidden="true" size={18} />} label="总箱数" value={String(props.totals.cartons)} />
       </section>
 
       <section className="form-band">
@@ -445,15 +628,15 @@ function WorkbenchPage(props: {
         </label>
         <label className="field">
           日期 Date
-          <input type="date" defaultValue="2025-10-12" />
+          <input type="date" value={props.orderDate} onChange={(event) => props.setOrderDate(event.target.value)} />
         </label>
         <label className="field">
           单号
-          <input placeholder="系统自动生成或手动录入" />
+          <input value={props.orderNo} onChange={(event) => props.setOrderNo(event.target.value)} placeholder="系统自动生成或手动录入" />
         </label>
         <label className="field">
           状态
-          <select defaultValue="草稿">
+          <select value={props.orderStatus} onChange={(event) => props.setOrderStatus(event.target.value)}>
             <option>草稿</option>
             <option>已确认</option>
             <option>已导出</option>
@@ -513,9 +696,9 @@ function WorkbenchPage(props: {
 
           <section className="panel-section">
             <h2>付款信息</h2>
-            <label className="field compact">DEPOSIT 订金<input type="number" min="0" step="0.01" placeholder="0.00" /></label>
-            <label className="field compact">BLANCE 余额<input type="number" min="0" step="0.01" placeholder="0.00" /></label>
-            <label className="field compact">银行账号<input placeholder="请输入银行账号（可选）" /></label>
+            <label className="field compact">DEPOSIT 订金<input type="number" min="0" step="0.01" value={props.deposit} onChange={(event) => props.setDeposit(event.target.value)} placeholder="0.00" /></label>
+            <label className="field compact">BLANCE 余额<input type="number" min="0" step="0.01" value={props.balance} onChange={(event) => props.setBalance(event.target.value)} placeholder="0.00" /></label>
+            <label className="field compact">银行账号<input value={props.bankAccount} onChange={(event) => props.setBankAccount(event.target.value)} placeholder="请输入银行账号（可选）" /></label>
           </section>
         </aside>
       </section>
@@ -586,6 +769,9 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeId, setActiveId] = useState(records[0]?.id ?? "");
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const allRecords = [...importedRecords, ...records];
   const filtered = allRecords.filter((record) => {
     const matchKeyword = !keyword || `${record.id}${record.customer}`.toLowerCase().includes(keyword.toLowerCase());
@@ -598,6 +784,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   const totalAmount = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.totalPrice), 0), 0);
   const totalCartons = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0), 0);
   const importedRows = importedRecords.reduce((sum, record) => sum + record.rows.length, 0);
+  const selectedExportCount = selectedFileIds.length;
 
   async function handleExcelImport(fileList: FileList | null) {
     const files = Array.from(fileList ?? []);
@@ -620,6 +807,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
       const nextRecords = payload.imported.map(mapImportedOrder);
       setImportedRecords((current) => [...nextRecords, ...current]);
       setActiveId(nextRecords[0]?.id ?? activeId);
+      setSelectedFileIds((current) => [...nextRecords.map((record) => record.sourceFileId).filter((id): id is string => Boolean(id)), ...current]);
       setKeyword("");
       setDate("");
       setStatus("全部");
@@ -632,13 +820,16 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   }
 
   async function handleBatchExport() {
-    if (filtered.length === 0) return;
+    if (selectedFileIds.length === 0) {
+      setImportMessage("请先勾选要打包导出的历史 Excel 原文件。");
+      return;
+    }
     setIsExporting(true);
     try {
-      const response = await fetch("/api/excel/export-history", {
+      const response = await fetch("/api/excel/export-history-files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: filtered })
+        body: JSON.stringify({ file_ids: selectedFileIds })
       });
       if (!response.ok) throw new Error(await response.text());
       const payload = (await response.json()) as { download_url: string };
@@ -650,6 +841,41 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
     }
   }
 
+  function toggleHistoryFile(fileId: string) {
+    setSelectedFileIds((current) => (current.includes(fileId) ? current.filter((id) => id !== fileId) : [...current, fileId]));
+  }
+
+  async function previewHistoryRecord(record: OrderRecord) {
+    if (!record.backendId) {
+      setImportMessage("该记录没有后端订单 ID，请先通过 Excel 导入或保存为真实订单。");
+      return;
+    }
+    try {
+      const response = await fetch(`/api/orders/${record.backendId}/preview`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { html: string };
+      setPreviewHtml(payload.html);
+      setPreviewOpen(true);
+    } catch (error) {
+      setImportMessage(`预览失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    }
+  }
+
+  async function exportHistoryRecord(record: OrderRecord) {
+    if (!record.backendId) {
+      setImportMessage("该记录没有后端订单 ID，请先通过 Excel 导入或保存为真实订单。");
+      return;
+    }
+    try {
+      const response = await fetch(`/api/orders/${record.backendId}/export-excel`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { download_url: string };
+      window.location.href = payload.download_url;
+    } catch (error) {
+      setImportMessage(`生成 Excel 失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    }
+  }
+
   return (
     <>
       <PageHeader title="历史装箱单" subtitle="导入、查询并批量导出历史单据">
@@ -657,8 +883,8 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
           {isImporting ? "导入中..." : "批量导入 Excel"}
           <input disabled={isImporting} type="file" accept=".xls,.xlsx" multiple onChange={(event) => handleExcelImport(event.target.files)} />
         </label>
-        <button className="secondary-button" type="button" onClick={handleBatchExport} disabled={filtered.length === 0 || isExporting}>
-          {isExporting ? "导出中..." : "批量导出"}
+        <button className="secondary-button" type="button" onClick={handleBatchExport} disabled={selectedExportCount === 0 || isExporting}>
+          {isExporting ? "打包中..." : `批量导出${selectedExportCount ? ` (${selectedExportCount})` : ""}`}
         </button>
         <button className="primary-button" type="button">新建装箱单</button>
       </PageHeader>
@@ -696,22 +922,35 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
           {filtered.map((record) => {
             const amount = record.rows.reduce((sum, item) => sum + toNumber(item.totalPrice), 0);
             const cartons = record.rows.reduce((sum, item) => sum + toNumber(item.cartonCount), 0);
+            const isSelectable = Boolean(record.sourceFileId);
+            const isChecked = Boolean(record.sourceFileId && selectedFileIds.includes(record.sourceFileId));
             return (
-              <button className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id} onClick={() => setActiveId(record.id)} type="button">
+              <div className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id}>
                 <div className="record-head">
-                  <strong>{record.id}</strong>
+                  <label className={isSelectable ? "history-select" : "history-select disabled"}>
+                    <input
+                      type="checkbox"
+                      disabled={!isSelectable}
+                      checked={isChecked}
+                      onChange={() => record.sourceFileId && toggleHistoryFile(record.sourceFileId)}
+                    />
+                    <strong>{record.id}</strong>
+                  </label>
                   <span className="status-pill">{record.status}</span>
                 </div>
-                <div className="history-meta">
-                  <span>{record.date}</span>
-                  <span>{record.customer}</span>
-                </div>
-                <div className="history-numbers">
-                  <span>{record.rows.length} 行</span>
-                  <span>{cartons} CTNS</span>
-                  <strong>${amount.toFixed(2)}</strong>
-                </div>
-              </button>
+                <button className="history-card-button" onClick={() => setActiveId(record.id)} type="button">
+                  <div className="history-meta">
+                    <span>{record.date}</span>
+                    <span>{record.customer}</span>
+                  </div>
+                  <div className="history-numbers">
+                    <span>{record.rows.length} 行</span>
+                    <span>{cartons} CTNS</span>
+                    <strong>${amount.toFixed(2)}</strong>
+                  </div>
+                  {record.sourceFileName && <span className="source-file-name">{record.sourceFileName}</span>}
+                </button>
+              </div>
             );
           })}
         </div>
@@ -724,8 +963,8 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
                 <p>{activeRecord.customer} / {activeRecord.date}</p>
               </div>
               <div className="panel-actions">
-                <button className="secondary-button" type="button">预览</button>
-                <button className="primary-button" type="button">生成 Excel</button>
+                <button className="secondary-button" type="button" onClick={() => void previewHistoryRecord(activeRecord)}>预览</button>
+                <button className="primary-button" type="button" onClick={() => void exportHistoryRecord(activeRecord)}>生成 Excel</button>
               </div>
             </div>
             <PackingTable rows={activeRecord.rows} selectedRows={[]} onUpdateRow={() => undefined} onToggleRow={() => undefined} />
@@ -734,6 +973,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
           <section className="empty-hint">暂无匹配的历史装箱单。</section>
         )}
       </section>
+      {previewOpen && <PreviewModal html={previewHtml} onClose={() => setPreviewOpen(false)} />}
     </>
   );
 }
@@ -964,11 +1204,28 @@ function ResizableDetailModal(props: {
   );
 }
 
+function PreviewModal({ html, onClose }: { html: string; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop">
+      <section className="modal preview-modal">
+        <div className="modal-head">
+          <h2>装箱单预览</h2>
+          <button className="ghost-button" type="button" onClick={onClose}>关闭</button>
+        </div>
+        <div className="preview-body" dangerouslySetInnerHTML={{ __html: html }} />
+      </section>
+    </div>
+  );
+}
+
 function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
     <header className="topbar">
       <div>
-        <h1>{title}</h1>
+        <div className="title-row">
+          <h1>{title}</h1>
+          <span className="save-state"><PackageCheck aria-hidden="true" size={14} />本地草稿</span>
+        </div>
         {subtitle && <p>{subtitle}</p>}
       </div>
       <div className="top-actions">{children}</div>
@@ -976,7 +1233,7 @@ function PageHeader({ title, subtitle, children }: { title: string; subtitle?: s
   );
 }
 
-function Summary({ icon, label, value, emphasis }: { icon: string; label: string; value: string; emphasis?: boolean }) {
+function Summary({ icon, label, value, emphasis }: { icon: ReactNode; label: string; value: string; emphasis?: boolean }) {
   return (
     <div className="summary-card">
       <span className="summary-icon">{icon}</span>
