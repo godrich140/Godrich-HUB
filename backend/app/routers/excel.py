@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
 from app.database import get_db
-from app.excel_templates import export_imported_files_zip
+from app.excel_templates import export_imported_files_zip, export_order_to_xls
 from app.models import FileAsset, PackingItem, PackingOrder
 from app.schemas import ExcelExportRequest, ExcelExportResponse, ExcelImportResponse, HistoryFileExportRequest
 from app.services import save_upload
@@ -139,7 +139,7 @@ def export_history_excel(payload: ExcelExportRequest, db: Session = Depends(get_
 
 @router.post("/export-history-files", response_model=ExcelExportResponse)
 def export_history_files(payload: HistoryFileExportRequest, db: Session = Depends(get_db)) -> ExcelExportResponse:
-    if not payload.file_ids:
+    if not payload.file_ids and not payload.order_ids:
         raise HTTPException(status_code=400, detail="No files selected")
 
     assets = list(db.scalars(select(FileAsset).where(FileAsset.id.in_(payload.file_ids))))
@@ -151,6 +151,22 @@ def export_history_files(payload: HistoryFileExportRequest, db: Session = Depend
     invalid = [asset.original_name for asset in assets if asset.file_type != "excel_imports"]
     if invalid:
         raise HTTPException(status_code=400, detail=f"Only imported Excel files can be packed: {', '.join(invalid)}")
+
+    if payload.order_ids:
+        orders = list(
+            db.scalars(
+                select(PackingOrder)
+                .where(PackingOrder.id.in_(payload.order_ids))
+                .options(selectinload(PackingOrder.items))
+            )
+        )
+        found_order_ids = {order.id for order in orders}
+        missing_order_ids = [order_id for order_id in payload.order_ids if order_id not in found_order_ids]
+        if missing_order_ids:
+            raise HTTPException(status_code=404, detail="Some orders were not found")
+        for order in orders:
+            generated_asset, _ = export_order_to_xls(db, order)
+            assets.append(generated_asset)
 
     asset, download_url = export_imported_files_zip(db, assets)
     return ExcelExportResponse(file=asset, download_url=download_url)

@@ -14,14 +14,16 @@ from app.schemas import ExcelExportResponse, OrderPreviewResponse, PackingOrderC
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-def _available_order_no(db: Session, requested: str) -> str:
+def _available_order_no(db: Session, requested: str, current_order_id: uuid.UUID | None = None) -> str:
     base = requested.strip() or f"PK{date.today():%Y%m%d}"
     candidate = base
     index = 2
-    while db.scalar(select(PackingOrder.id).where(PackingOrder.order_no == candidate)):
+    while True:
+        existing_id = db.scalar(select(PackingOrder.id).where(PackingOrder.order_no == candidate))
+        if not existing_id or existing_id == current_order_id:
+            return candidate
         candidate = f"{base}-{index}"
         index += 1
-    return candidate
 
 
 @router.get("", response_model=list[PackingOrderRead])
@@ -69,11 +71,14 @@ def update_order(order_id: uuid.UUID, payload: PackingOrderUpdate, db: Session =
         raise HTTPException(status_code=404, detail="Order not found")
 
     data = payload.model_dump(exclude_unset=True, exclude={"items"})
+    if "order_no" in data:
+        data["order_no"] = _available_order_no(db, data["order_no"], order.id)
     for key, value in data.items():
         setattr(order, key, value)
 
     if payload.items is not None:
         order.items.clear()
+        db.flush()
         order.items.extend(PackingItem(**item.model_dump()) for item in payload.items)
 
     db.commit()

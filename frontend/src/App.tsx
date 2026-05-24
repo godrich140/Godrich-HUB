@@ -252,6 +252,10 @@ function mapImportedOrder(item: ApiImportItem): OrderRecord {
   };
 }
 
+function historySelectionKey(record: OrderRecord) {
+  return record.sourceFileId ?? record.backendId ?? record.id;
+}
+
 function toApiDecimal(value: string): number | null {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -793,7 +797,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeId, setActiveId] = useState(records[0]?.id ?? "");
-  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<string[]>([]);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const allRecords = [...importedRecords, ...records];
@@ -808,7 +812,8 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   const totalAmount = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.totalPrice), 0), 0);
   const totalCartons = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0), 0);
   const importedRows = importedRecords.reduce((sum, record) => sum + record.rows.length, 0);
-  const selectedExportCount = selectedFileIds.length;
+  const selectedExportRecords = allRecords.filter((record) => selectedHistoryKeys.includes(historySelectionKey(record)));
+  const selectedExportCount = selectedExportRecords.length;
 
   async function handleExcelImport(fileList: FileList | null) {
     const files = Array.from(fileList ?? []);
@@ -831,7 +836,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
       const nextRecords = payload.imported.map(mapImportedOrder);
       setImportedRecords((current) => [...nextRecords, ...current]);
       setActiveId(nextRecords[0]?.id ?? activeId);
-      setSelectedFileIds((current) => [...nextRecords.map((record) => record.sourceFileId).filter((id): id is string => Boolean(id)), ...current]);
+      setSelectedHistoryKeys((current) => [...nextRecords.map(historySelectionKey), ...current]);
       setKeyword("");
       setDate("");
       setStatus("全部");
@@ -844,16 +849,21 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   }
 
   async function handleBatchExport() {
-    if (selectedFileIds.length === 0) {
-      setImportMessage("请先勾选要打包导出的历史 Excel 原文件。");
+    if (selectedExportRecords.length === 0) {
+      setImportMessage("请先勾选要打包导出的历史 Excel 文件。");
       return;
     }
+    const fileIds = selectedExportRecords.map((record) => record.sourceFileId).filter((id): id is string => Boolean(id));
+    const orderIds = selectedExportRecords
+      .filter((record) => !record.sourceFileId)
+      .map((record) => record.backendId)
+      .filter((id): id is string => Boolean(id));
     setIsExporting(true);
     try {
       const response = await fetch("/api/excel/export-history-files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_ids: selectedFileIds })
+        body: JSON.stringify({ file_ids: fileIds, order_ids: orderIds })
       });
       if (!response.ok) throw new Error(await response.text());
       const payload = (await response.json()) as { download_url: string };
@@ -865,8 +875,9 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
     }
   }
 
-  function toggleHistoryFile(fileId: string) {
-    setSelectedFileIds((current) => (current.includes(fileId) ? current.filter((id) => id !== fileId) : [...current, fileId]));
+  function toggleHistoryFile(record: OrderRecord) {
+    const key = historySelectionKey(record);
+    setSelectedHistoryKeys((current) => (current.includes(key) ? current.filter((id) => id !== key) : [...current, key]));
   }
 
   async function previewHistoryRecord(record: OrderRecord) {
@@ -945,8 +956,9 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
           {filtered.map((record) => {
             const amount = record.rows.reduce((sum, item) => sum + toNumber(item.totalPrice), 0);
             const cartons = record.rows.reduce((sum, item) => sum + toNumber(item.cartonCount), 0);
-            const isSelectable = Boolean(record.sourceFileId);
-            const isChecked = Boolean(record.sourceFileId && selectedFileIds.includes(record.sourceFileId));
+            const selectionKey = historySelectionKey(record);
+            const isSelectable = Boolean(record.sourceFileId || record.backendId);
+            const isChecked = selectedHistoryKeys.includes(selectionKey);
             return (
               <div className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id}>
                 <div className="record-head">
@@ -954,7 +966,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
                     className={isSelectable ? "history-select" : "history-select disabled"}
                     type="button"
                     disabled={!isSelectable}
-                    onClick={() => record.sourceFileId && toggleHistoryFile(record.sourceFileId)}
+                    onClick={() => toggleHistoryFile(record)}
                   >
                     <span className={isChecked ? "history-checkbox checked" : "history-checkbox"}>{isChecked ? "✓" : ""}</span>
                     <strong>{record.id}</strong>

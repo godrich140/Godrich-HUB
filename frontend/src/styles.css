@@ -1617,16 +1617,19 @@ h2 {
 .history-select {
   display: inline-flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
   gap: 8px;
   border: 0;
-  padding: 0;
+  padding: 4px 0;
   background: transparent;
   color: var(--app-text);
+  cursor: pointer;
   text-align: left;
 }
 
 .history-select.disabled {
+  cursor: not-allowed;
   opacity: 0.55;
 }
 
@@ -1691,6 +1694,11 @@ h2 {
   margin-bottom: 8px;
   color: var(--app-muted);
   text-align: center;
+}
+
+.excel-preview-doc > .excel-preview-address {
+  line-height: 1.5;
+  text-align: left;
 }
 
 .excel-preview-meta,

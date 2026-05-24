@@ -79,7 +79,7 @@ def _style(
 
 TITLE_STYLE = _style(bold=True, font_height=320)
 SUBTITLE_STYLE = _style(font_height=220)
-ADDRESS_STYLE = _style(font_height=180, wrap=True)
+ADDRESS_STYLE = _style(font_height=180, align="left", wrap=True)
 INFO_STYLE = _style(font_height=200, align="left", border=True)
 HEAD_STYLE = _style(bold=True, font_height=190, border=True, wrap=True)
 CELL_STYLE = _style(font_height=190, border=True, wrap=True)
@@ -191,6 +191,11 @@ def _write_order_sheet(sheet: xlwt.Worksheet, order: PackingOrder) -> None:
 
 def render_order_preview(order: PackingOrder) -> str:
     headers = ["品名", "产品描述", "图片", "数量", "单位", "单价", "总价", "数量/箱", "箱数", "毛重/箱", "体积", "总毛重", "箱子规格", "总体积"]
+    address = (
+        "地址:广州市越秀区恒福路155号益友(国际)汽配用品展贸中心富一楼GC023 "
+        "Add:GC023 Floor Yiyou International Auto Accessories Trade Center NO.155 Hengfu Road,Yuexiu District.GuangZhou.China. "
+        "E-mail:gzbj1698@163.com QQ:1436367790 电话/Tel:020-62229272传真/Fax:020-62229272 Huang Cai Ling Mob:13622857278"
+    )
     rows = []
     for item in order.items:
         values = [
@@ -215,6 +220,7 @@ def render_order_preview(order: PackingOrder) -> str:
         "<section class=\"excel-preview-doc\">"
         "<h2>广 州 宝 捷 汽 车 用 品</h2>"
         "<p>Guangzhou Baojie Auto Accessories Factory</p>"
+        f"<p class=\"excel-preview-address\">{html.escape(address)}</p>"
         f"<div class=\"excel-preview-meta\"><span>客户Customer：{html.escape(order.customer_name)}</span><span>日期Date:{order.order_date:%Y-%m-%d}</span></div>"
         "<table><thead><tr>"
         + "".join(f"<th>{header}</th>" for header in headers)

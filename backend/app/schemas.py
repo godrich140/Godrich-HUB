@@ -167,7 +167,8 @@ class OrderPreviewResponse(BaseModel):
 
 
 class HistoryFileExportRequest(BaseModel):
-    file_ids: list[uuid.UUID]
+    file_ids: list[uuid.UUID] = Field(default_factory=list)
+    order_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
 class OcrAnalyzeRequest(BaseModel):
