@@ -1619,18 +1619,34 @@ h2 {
   align-items: center;
   min-width: 0;
   gap: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: var(--app-text);
+  text-align: left;
 }
 
 .history-select.disabled {
   opacity: 0.55;
 }
 
-.history-select input {
-  width: 18px;
-  height: 18px;
-  min-height: 18px;
-  accent-color: var(--app-blue);
+.history-checkbox {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.history-checkbox.checked {
+  border-color: var(--app-blue);
+  background: var(--app-blue);
 }
 
 .history-card-button {

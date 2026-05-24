@@ -14,6 +14,16 @@ from app.schemas import ExcelExportResponse, OrderPreviewResponse, PackingOrderC
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
+def _available_order_no(db: Session, requested: str) -> str:
+    base = requested.strip() or f"PK{date.today():%Y%m%d}"
+    candidate = base
+    index = 2
+    while db.scalar(select(PackingOrder.id).where(PackingOrder.order_no == candidate)):
+        candidate = f"{base}-{index}"
+        index += 1
+    return candidate
+
+
 @router.get("", response_model=list[PackingOrderRead])
 def list_orders(
     keyword: str | None = Query(default=None),
@@ -35,6 +45,7 @@ def list_orders(
 @router.post("", response_model=PackingOrderRead)
 def create_order(payload: PackingOrderCreate, db: Session = Depends(get_db)) -> PackingOrder:
     order_data = payload.model_dump(exclude={"items"})
+    order_data["order_no"] = _available_order_no(db, order_data["order_no"])
     order = PackingOrder(**order_data)
     order.items = [PackingItem(**item.model_dump()) for item in payload.items]
     db.add(order)

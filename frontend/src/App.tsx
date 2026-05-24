@@ -297,12 +297,18 @@ function orderToApiPayload(order: {
   };
 }
 
+function nextOrderNo() {
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10).replaceAll("-", "");
+  return `PK${datePart}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+}
+
 export function App() {
   const [page, setPage] = useState<PageKey>("workbench");
   const [customers, setCustomers] = useState(customersSeed);
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [orderDate, setOrderDate] = useState("2025-10-12");
-  const [orderNo, setOrderNo] = useState(`PK${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-001`);
+  const [orderNo, setOrderNo] = useState(nextOrderNo);
   const [orderStatus, setOrderStatus] = useState("草稿");
   const [deposit, setDeposit] = useState("");
   const [balance, setBalance] = useState("");
@@ -348,6 +354,21 @@ export function App() {
     if (!window.confirm("确定要清空当前明细录入吗？")) return;
     setRows([row(String(Date.now()))]);
     setSelectedRows([]);
+  }
+
+  function newWorkbenchOrder() {
+    setActiveOrderId(null);
+    setSelectedCustomer("");
+    setOrderDate(new Date().toISOString().slice(0, 10));
+    setOrderNo(nextOrderNo());
+    setOrderStatus("草稿");
+    setDeposit("");
+    setBalance("");
+    setBankAccount("");
+    setRows([row(String(Date.now()))]);
+    setSelectedRows([]);
+    setActionMessage("已新建一张空白装箱单。");
+    setPage("workbench");
   }
 
   function toggleSelectedRow(rowId: string) {
@@ -535,6 +556,7 @@ export function App() {
             onUnmergeRows={unmergeSelectedRows}
             onUploadOcr={handleUploadOcr}
             onClearRows={clearRows}
+            onNewOrder={newWorkbenchOrder}
             onSaveOrder={saveCurrentOrder}
             onPreviewOrder={previewCurrentOrder}
             onExportOrder={exportCurrentOrder}
@@ -594,6 +616,7 @@ function WorkbenchPage(props: {
   onUnmergeRows: () => void;
   onUploadOcr: () => void;
   onClearRows: () => void;
+  onNewOrder: () => void;
   onSaveOrder: () => Promise<string>;
   onPreviewOrder: () => void;
   onExportOrder: () => void;
@@ -604,6 +627,7 @@ function WorkbenchPage(props: {
   return (
     <>
       <PageHeader title="装箱单工作台" subtitle="高效创建与管理装箱单">
+        <button className="secondary-button icon-button" type="button" onClick={props.onNewOrder}><FileSpreadsheet aria-hidden="true" size={17} />新建装箱单</button>
         <button className="secondary-button icon-button" type="button" onClick={() => void props.onSaveOrder()} disabled={props.isSavingOrder}><Save aria-hidden="true" size={17} />{props.isSavingOrder ? "保存中..." : "保存草稿"}</button>
         <button className="secondary-button icon-button" type="button" onClick={props.onPreviewOrder} disabled={props.isSavingOrder}><Eye aria-hidden="true" size={17} />预览表格</button>
         <button className="primary-button icon-button" type="button" onClick={props.onExportOrder} disabled={props.isSavingOrder}><FileSpreadsheet aria-hidden="true" size={17} />生成 Excel</button>
@@ -886,7 +910,6 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
         <button className="secondary-button" type="button" onClick={handleBatchExport} disabled={selectedExportCount === 0 || isExporting}>
           {isExporting ? "打包中..." : `批量导出${selectedExportCount ? ` (${selectedExportCount})` : ""}`}
         </button>
-        <button className="primary-button" type="button">新建装箱单</button>
       </PageHeader>
 
       <section className="import-panel">
@@ -927,15 +950,15 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
             return (
               <div className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id}>
                 <div className="record-head">
-                  <label className={isSelectable ? "history-select" : "history-select disabled"}>
-                    <input
-                      type="checkbox"
-                      disabled={!isSelectable}
-                      checked={isChecked}
-                      onChange={() => record.sourceFileId && toggleHistoryFile(record.sourceFileId)}
-                    />
+                  <button
+                    className={isSelectable ? "history-select" : "history-select disabled"}
+                    type="button"
+                    disabled={!isSelectable}
+                    onClick={() => record.sourceFileId && toggleHistoryFile(record.sourceFileId)}
+                  >
+                    <span className={isChecked ? "history-checkbox checked" : "history-checkbox"}>{isChecked ? "✓" : ""}</span>
                     <strong>{record.id}</strong>
-                  </label>
+                  </button>
                   <span className="status-pill">{record.status}</span>
                 </div>
                 <button className="history-card-button" onClick={() => setActiveId(record.id)} type="button">
