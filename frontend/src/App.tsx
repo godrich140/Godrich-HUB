@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Boxes,
   ChartNoAxesCombined,
@@ -59,13 +59,7 @@ type OrderRecord = {
   rows: PackingRow[];
 };
 
-type ApiImportItem = {
-  file: {
-    id: string;
-    original_name: string;
-    storage_path: string;
-  };
-  order: {
+type ApiPackingOrder = {
     id: string;
     order_no: string;
     customer_name: string;
@@ -89,6 +83,14 @@ type ApiImportItem = {
       merge_group_id: string | null;
     }>;
   };
+
+type ApiImportItem = {
+  file: {
+    id: string;
+    original_name: string;
+    storage_path: string;
+  };
+  order: ApiPackingOrder;
 };
 
 const navigation: Array<{ key: PageKey; label: string; icon: LucideIcon }> = [
@@ -232,6 +234,34 @@ function mapImportedOrder(item: ApiImportItem): OrderRecord {
     customer: item.order.customer_name,
     status: item.order.status === "draft" ? "草稿" : item.order.status,
     rows: item.order.items.map((detail) =>
+      row(detail.id, {
+        itemName: apiValue(detail.item_name),
+        description: apiValue(detail.description),
+        quantity: apiValue(detail.quantity),
+        unit: apiValue(detail.unit),
+        unitPrice: apiValue(detail.unit_price),
+        totalPrice: apiValue(detail.total_price),
+        qtyPerCarton: apiValue(detail.qty_per_carton),
+        cartonCount: apiValue(detail.carton_count),
+        grossWeightCtn: apiValue(detail.gross_weight_ctn),
+        cbm: apiValue(detail.cbm),
+        totalGrossWeight: apiValue(detail.total_gross_weight),
+        measureCm: apiValue(detail.measure_cm),
+        totalCbm: apiValue(detail.total_cbm),
+        mergeGroupId: detail.merge_group_id || undefined
+      })
+    )
+  };
+}
+
+function mapApiOrder(orderItem: ApiPackingOrder): OrderRecord {
+  return {
+    backendId: orderItem.id,
+    id: orderItem.order_no,
+    date: orderItem.order_date,
+    customer: orderItem.customer_name,
+    status: orderItem.status === "draft" ? "草稿" : orderItem.status,
+    rows: orderItem.items.map((detail) =>
       row(detail.id, {
         itemName: apiValue(detail.item_name),
         description: apiValue(detail.description),
@@ -790,30 +820,56 @@ function PackingTable(props: {
 
 function HistoryPage({ records }: { records: OrderRecord[] }) {
   const [keyword, setKeyword] = useState("");
-  const [date, setDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [status, setStatus] = useState("全部");
   const [importMessage, setImportMessage] = useState("请选择 .xls 或 .xlsx 文件，系统会保存到服务器并生成待核对草稿单。");
+  const [serverRecords, setServerRecords] = useState<OrderRecord[]>([]);
   const [importedRecords, setImportedRecords] = useState<OrderRecord[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [activeId, setActiveId] = useState(records[0]?.id ?? "");
+  const [activeId, setActiveId] = useState("");
   const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<string[]>([]);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const allRecords = [...importedRecords, ...records];
+  const allRecords = [...importedRecords, ...serverRecords, ...records].filter((record, index, source) => source.findIndex((item) => item.id === record.id) === index);
   const filtered = allRecords.filter((record) => {
     const matchKeyword = !keyword || `${record.id}${record.customer}`.toLowerCase().includes(keyword.toLowerCase());
-    const matchDate = !date || record.date === date;
+    const matchStartDate = !startDate || record.date >= startDate;
+    const matchEndDate = !endDate || record.date <= endDate;
     const matchStatus = status === "全部" || record.status === status;
-    return matchKeyword && matchDate && matchStatus;
+    return matchKeyword && matchStartDate && matchEndDate && matchStatus;
   });
   const activeRecord = filtered.find((record) => record.id === activeId) ?? filtered[0];
   const totalRows = filtered.reduce((sum, record) => sum + record.rows.length, 0);
   const totalAmount = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.totalPrice), 0), 0);
   const totalCartons = filtered.reduce((sum, record) => sum + record.rows.reduce((rowSum, item) => rowSum + toNumber(item.cartonCount), 0), 0);
   const importedRows = importedRecords.reduce((sum, record) => sum + record.rows.length, 0);
-  const selectedExportRecords = allRecords.filter((record) => selectedHistoryKeys.includes(historySelectionKey(record)));
+  const selectedExportRecords = allRecords.filter((record) => (record.sourceFileId || record.backendId) && selectedHistoryKeys.includes(historySelectionKey(record)));
   const selectedExportCount = selectedExportRecords.length;
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadOrders() {
+      try {
+        const response = await fetch("/api/orders");
+        if (!response.ok) throw new Error(await response.text());
+        const payload = (await response.json()) as ApiPackingOrder[];
+        if (!isMounted) return;
+        const nextRecords = payload.map(mapApiOrder);
+        setServerRecords(nextRecords);
+        setActiveId((current) => current || nextRecords[0]?.id || "");
+      } catch (error) {
+        if (isMounted) {
+          setImportMessage(`历史订单加载失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+        }
+      }
+    }
+    void loadOrders();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleExcelImport(fileList: FileList | null) {
     const files = Array.from(fileList ?? []);
@@ -838,7 +894,8 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
       setActiveId(nextRecords[0]?.id ?? activeId);
       setSelectedHistoryKeys((current) => [...nextRecords.map(historySelectionKey), ...current]);
       setKeyword("");
-      setDate("");
+      setStartDate("");
+      setEndDate("");
       setStatus("全部");
       setImportMessage(`服务器已保存 ${payload.imported.length} 个 Excel 文件，并生成 ${nextRecords.length} 张待核对草稿单。`);
     } catch (error) {
@@ -896,21 +953,6 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
     }
   }
 
-  async function exportHistoryRecord(record: OrderRecord) {
-    if (!record.backendId) {
-      setImportMessage("该记录没有后端订单 ID，请先通过 Excel 导入或保存为真实订单。");
-      return;
-    }
-    try {
-      const response = await fetch(`/api/orders/${record.backendId}/export-excel`, { method: "POST" });
-      if (!response.ok) throw new Error(await response.text());
-      const payload = (await response.json()) as { download_url: string };
-      window.location.href = payload.download_url;
-    } catch (error) {
-      setImportMessage(`生成 Excel 失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
-    }
-  }
-
   return (
     <>
       <PageHeader title="历史装箱单" subtitle="导入、查询并批量导出历史单据">
@@ -947,7 +989,8 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
 
       <section className="query-band history-query">
         <label className="field">单据 / 客户<input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入单据编号或客户名称" /></label>
-        <label className="field">日期<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+        <label className="field">开始日期<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+        <label className="field">结束日期<input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
         <label className="field">状态<select value={status} onChange={(event) => setStatus(event.target.value)}><option>全部</option><option>草稿</option><option>已生成</option><option>已导出</option></select></label>
       </section>
 
@@ -955,35 +998,26 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
         <div className="record-list history-list">
           {filtered.map((record) => {
             const amount = record.rows.reduce((sum, item) => sum + toNumber(item.totalPrice), 0);
-            const cartons = record.rows.reduce((sum, item) => sum + toNumber(item.cartonCount), 0);
             const selectionKey = historySelectionKey(record);
             const isSelectable = Boolean(record.sourceFileId || record.backendId);
             const isChecked = selectedHistoryKeys.includes(selectionKey);
             return (
               <div className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id}>
-                <div className="record-head">
-                  <button
-                    className={isSelectable ? "history-select" : "history-select disabled"}
-                    type="button"
+                <label className={isSelectable ? "history-select" : "history-select disabled"}>
+                  <input
+                    checked={isChecked}
                     disabled={!isSelectable}
-                    onClick={() => toggleHistoryFile(record)}
-                  >
-                    <span className={isChecked ? "history-checkbox checked" : "history-checkbox"}>{isChecked ? "✓" : ""}</span>
+                    onChange={() => toggleHistoryFile(record)}
+                    type="checkbox"
+                  />
+                  <span className="history-list-main">
                     <strong>{record.id}</strong>
-                  </button>
-                  <span className="status-pill">{record.status}</span>
-                </div>
-                <button className="history-card-button" onClick={() => setActiveId(record.id)} type="button">
-                  <div className="history-meta">
                     <span>{record.date}</span>
-                    <span>{record.customer}</span>
-                  </div>
-                  <div className="history-numbers">
-                    <span>{record.rows.length} 行</span>
-                    <span>{cartons} CTNS</span>
-                    <strong>${amount.toFixed(2)}</strong>
-                  </div>
-                  {record.sourceFileName && <span className="source-file-name">{record.sourceFileName}</span>}
+                  </span>
+                  <strong className="history-list-total">${amount.toFixed(2)}</strong>
+                </label>
+                <button className="history-card-button" onClick={() => setActiveId(record.id)} type="button">
+                  <span>查看明细</span>
                 </button>
               </div>
             );
@@ -999,7 +1033,6 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
               </div>
               <div className="panel-actions">
                 <button className="secondary-button" type="button" onClick={() => void previewHistoryRecord(activeRecord)}>预览</button>
-                <button className="primary-button" type="button" onClick={() => void exportHistoryRecord(activeRecord)}>生成 Excel</button>
               </div>
             </div>
             <PackingTable rows={activeRecord.rows} selectedRows={[]} onUpdateRow={() => undefined} onToggleRow={() => undefined} />

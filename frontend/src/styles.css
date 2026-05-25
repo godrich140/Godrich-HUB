@@ -822,9 +822,9 @@ textarea:focus {
 .history-card {
   display: grid;
   width: 100%;
-  gap: 12px;
+  gap: 8px;
   border-color: #e3e9f2;
-  padding: 16px;
+  padding: 12px;
   text-align: left;
 }
 
@@ -1615,17 +1615,25 @@ h2 {
 }
 
 .history-select {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   width: 100%;
   min-width: 0;
-  gap: 8px;
+  gap: 10px;
   border: 0;
-  padding: 4px 0;
+  padding: 0;
   background: transparent;
   color: var(--app-text);
   cursor: pointer;
   text-align: left;
+}
+
+.history-select input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--app-blue);
 }
 
 .history-select.disabled {
@@ -1633,33 +1641,39 @@ h2 {
   opacity: 0.55;
 }
 
-.history-checkbox {
+.history-list-main {
   display: grid;
-  width: 19px;
-  height: 19px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid var(--app-border);
-  border-radius: 6px;
-  background: #fff;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
+  min-width: 0;
+  gap: 2px;
 }
 
-.history-checkbox.checked {
-  border-color: var(--app-blue);
-  background: var(--app-blue);
+.history-list-main strong,
+.history-list-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-list-main span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.history-list-total {
+  color: var(--gold);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .history-card-button {
-  display: grid;
-  width: 100%;
-  gap: 10px;
+  justify-self: start;
   border: 0;
   padding: 0;
   background: transparent;
-  color: inherit;
+  color: var(--app-blue);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
   text-align: left;
 }
 
