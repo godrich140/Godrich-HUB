@@ -828,6 +828,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   const [importedRecords, setImportedRecords] = useState<OrderRecord[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activeId, setActiveId] = useState("");
   const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<string[]>([]);
   const [previewHtml, setPreviewHtml] = useState("");
@@ -932,6 +933,42 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
     }
   }
 
+  async function handleBatchDelete() {
+    if (selectedExportRecords.length === 0) {
+      setImportMessage("请先勾选要删除的历史单据。");
+      return;
+    }
+    const confirmed = window.confirm(`确定删除已选 ${selectedExportRecords.length} 条历史单据？删除后不可恢复。`);
+    if (!confirmed) return;
+
+    const fileIds = selectedExportRecords.map((record) => record.sourceFileId).filter((id): id is string => Boolean(id));
+    const orderIds = selectedExportRecords
+      .filter((record) => !record.sourceFileId)
+      .map((record) => record.backendId)
+      .filter((id): id is string => Boolean(id));
+    const deletedKeys = new Set(selectedExportRecords.map(historySelectionKey));
+    const deletedRecordIds = new Set(selectedExportRecords.map((record) => record.id));
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch("/api/excel/delete-history-files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_ids: fileIds, order_ids: orderIds })
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setImportedRecords((current) => current.filter((record) => !deletedKeys.has(historySelectionKey(record))));
+      setServerRecords((current) => current.filter((record) => !deletedKeys.has(historySelectionKey(record))));
+      setSelectedHistoryKeys((current) => current.filter((key) => !deletedKeys.has(key)));
+      setActiveId((current) => (deletedRecordIds.has(current) ? "" : current));
+      setImportMessage(`已删除 ${selectedExportRecords.length} 条历史单据。`);
+    } catch (error) {
+      setImportMessage(`批量删除失败：${error instanceof Error ? error.message : "服务器接口异常"}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   function toggleHistoryFile(record: OrderRecord) {
     const key = historySelectionKey(record);
     setSelectedHistoryKeys((current) => (current.includes(key) ? current.filter((id) => id !== key) : [...current, key]));
@@ -962,6 +999,9 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
         </label>
         <button className="secondary-button" type="button" onClick={handleBatchExport} disabled={selectedExportCount === 0 || isExporting}>
           {isExporting ? "打包中..." : `批量导出${selectedExportCount ? ` (${selectedExportCount})` : ""}`}
+        </button>
+        <button className="secondary-button danger-button" type="button" onClick={handleBatchDelete} disabled={selectedExportCount === 0 || isDeleting}>
+          {isDeleting ? "删除中..." : `批量删除${selectedExportCount ? ` (${selectedExportCount})` : ""}`}
         </button>
       </PageHeader>
 
@@ -1001,9 +1041,18 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
             const selectionKey = historySelectionKey(record);
             const isSelectable = Boolean(record.sourceFileId || record.backendId);
             const isChecked = selectedHistoryKeys.includes(selectionKey);
+            const cardClass = [
+              "record-card",
+              "history-card",
+              activeRecord?.id === record.id ? "active" : "",
+              isChecked ? "selected" : "",
+              isSelectable ? "" : "disabled"
+            ]
+              .filter(Boolean)
+              .join(" ");
             return (
-              <div className={activeRecord?.id === record.id ? "record-card history-card active" : "record-card history-card"} key={record.id}>
-                <label className={isSelectable ? "history-select" : "history-select disabled"}>
+              <div className={cardClass} key={record.id} onClick={() => setActiveId(record.id)} role="button" tabIndex={0} onKeyDown={(event) => event.key === "Enter" && setActiveId(record.id)}>
+                <label className={isSelectable ? "history-select" : "history-select disabled"} onClick={(event) => event.stopPropagation()}>
                   <input
                     checked={isChecked}
                     disabled={!isSelectable}
@@ -1016,9 +1065,6 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
                   </span>
                   <strong className="history-list-total">${amount.toFixed(2)}</strong>
                 </label>
-                <button className="history-card-button" onClick={() => setActiveId(record.id)} type="button">
-                  <span>查看明细</span>
-                </button>
               </div>
             );
           })}

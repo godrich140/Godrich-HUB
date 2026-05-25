@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.excel_templates import export_imported_files_zip, export_order_to_xls
 from app.models import FileAsset, PackingItem, PackingOrder
-from app.schemas import ExcelExportRequest, ExcelExportResponse, ExcelImportResponse, HistoryFileExportRequest
+from app.schemas import ExcelExportRequest, ExcelExportResponse, ExcelImportResponse, HistoryFileDeleteRequest, HistoryFileDeleteResponse, HistoryFileExportRequest
 from app.services import save_upload
 
 
@@ -170,6 +170,50 @@ def export_history_files(payload: HistoryFileExportRequest, db: Session = Depend
 
     asset, download_url = export_imported_files_zip(db, assets)
     return ExcelExportResponse(file=asset, download_url=download_url)
+
+
+@router.post("/delete-history-files", response_model=HistoryFileDeleteResponse)
+def delete_history_files(payload: HistoryFileDeleteRequest, db: Session = Depends(get_db)) -> HistoryFileDeleteResponse:
+    if not payload.file_ids and not payload.order_ids:
+        raise HTTPException(status_code=400, detail="No records selected")
+
+    deleted_files = 0
+    deleted_orders = 0
+    order_ids = set(payload.order_ids)
+
+    if payload.file_ids:
+        assets = list(db.scalars(select(FileAsset).where(FileAsset.id.in_(payload.file_ids))))
+        found_ids = {asset.id for asset in assets}
+        missing = [file_id for file_id in payload.file_ids if file_id not in found_ids]
+        if missing:
+            raise HTTPException(status_code=404, detail="Some Excel files were not found")
+
+        invalid = [asset.original_name for asset in assets if asset.file_type != "excel_imports"]
+        if invalid:
+            raise HTTPException(status_code=400, detail=f"Only imported Excel files can be deleted: {', '.join(invalid)}")
+
+        for asset in assets:
+            if asset.biz_id:
+                order_ids.add(asset.biz_id)
+            path = Path(asset.storage_path)
+            if path.exists():
+                path.unlink()
+            db.delete(asset)
+            deleted_files += 1
+
+    if order_ids:
+        orders = list(db.scalars(select(PackingOrder).where(PackingOrder.id.in_(order_ids))))
+        found_order_ids = {order.id for order in orders}
+        missing_order_ids = [order_id for order_id in order_ids if order_id not in found_order_ids]
+        if missing_order_ids:
+            raise HTTPException(status_code=404, detail="Some orders were not found")
+
+        for order in orders:
+            db.delete(order)
+            deleted_orders += 1
+
+    db.commit()
+    return HistoryFileDeleteResponse(deleted_files=deleted_files, deleted_orders=deleted_orders)
 
 
 @router.get("/download/{file_id}")

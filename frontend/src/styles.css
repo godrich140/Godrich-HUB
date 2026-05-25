@@ -820,11 +820,11 @@ textarea:focus {
 }
 
 .history-card {
-  display: grid;
+  display: block;
   width: 100%;
-  gap: 8px;
   border-color: #e3e9f2;
-  padding: 12px;
+  padding: 9px 10px;
+  cursor: pointer;
   text-align: left;
 }
 
@@ -832,6 +832,20 @@ textarea:focus {
   border-color: #315da9;
   background: #f4f7ff;
   box-shadow: 0 12px 24px rgba(49, 93, 169, 0.13);
+}
+
+.history-card.selected {
+  border-color: rgba(0, 113, 227, 0.58);
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.history-card.disabled {
+  cursor: default;
+}
+
+.history-card:focus-visible {
+  outline: 2px solid var(--app-blue);
+  outline-offset: 2px;
 }
 
 .record-head {
@@ -1616,11 +1630,11 @@ h2 {
 
 .history-select {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   width: 100%;
   min-width: 0;
-  gap: 10px;
+  gap: 9px;
   border: 0;
   padding: 0;
   background: transparent;
@@ -1642,9 +1656,10 @@ h2 {
 }
 
 .history-list-main {
-  display: grid;
+  display: flex;
+  align-items: baseline;
   min-width: 0;
-  gap: 2px;
+  gap: 10px;
 }
 
 .history-list-main strong,
