@@ -829,9 +829,9 @@ textarea:focus {
 }
 
 .history-card.active {
-  border-color: #315da9;
-  background: #f4f7ff;
-  box-shadow: 0 12px 24px rgba(49, 93, 169, 0.13);
+  border-color: #e3e9f2;
+  background: #fff;
+  box-shadow: none;
 }
 
 .history-card.selected {

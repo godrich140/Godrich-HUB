@@ -1052,11 +1052,14 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
               .join(" ");
             return (
               <div className={cardClass} key={record.id} onClick={() => setActiveId(record.id)} role="button" tabIndex={0} onKeyDown={(event) => event.key === "Enter" && setActiveId(record.id)}>
-                <label className={isSelectable ? "history-select" : "history-select disabled"} onClick={(event) => event.stopPropagation()}>
+                <label className={isSelectable ? "history-select" : "history-select disabled"}>
                   <input
                     checked={isChecked}
                     disabled={!isSelectable}
-                    onChange={() => toggleHistoryFile(record)}
+                    onChange={() => {
+                      setActiveId(record.id);
+                      toggleHistoryFile(record);
+                    }}
                     type="checkbox"
                   />
                   <span className="history-list-main">
