@@ -6,11 +6,24 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
+from app.excel_templates import export_order_to_xls, render_order_preview
 from app.models import PackingItem, PackingOrder
-from app.schemas import PackingOrderCreate, PackingOrderRead, PackingOrderUpdate
+from app.schemas import ExcelExportResponse, OrderPreviewResponse, PackingOrderCreate, PackingOrderRead, PackingOrderUpdate
 
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+def _available_order_no(db: Session, requested: str, current_order_id: uuid.UUID | None = None) -> str:
+    base = requested.strip() or f"PK{date.today():%Y%m%d}"
+    candidate = base
+    index = 2
+    while True:
+        existing_id = db.scalar(select(PackingOrder.id).where(PackingOrder.order_no == candidate))
+        if not existing_id or existing_id == current_order_id:
+            return candidate
+        candidate = f"{base}-{index}"
+        index += 1
 
 
 @router.get("", response_model=list[PackingOrderRead])
@@ -34,6 +47,7 @@ def list_orders(
 @router.post("", response_model=PackingOrderRead)
 def create_order(payload: PackingOrderCreate, db: Session = Depends(get_db)) -> PackingOrder:
     order_data = payload.model_dump(exclude={"items"})
+    order_data["order_no"] = _available_order_no(db, order_data["order_no"])
     order = PackingOrder(**order_data)
     order.items = [PackingItem(**item.model_dump()) for item in payload.items]
     db.add(order)
@@ -57,12 +71,28 @@ def update_order(order_id: uuid.UUID, payload: PackingOrderUpdate, db: Session =
         raise HTTPException(status_code=404, detail="Order not found")
 
     data = payload.model_dump(exclude_unset=True, exclude={"items"})
+    if "order_no" in data:
+        data["order_no"] = _available_order_no(db, data["order_no"], order.id)
     for key, value in data.items():
         setattr(order, key, value)
 
     if payload.items is not None:
         order.items.clear()
+        db.flush()
         order.items.extend(PackingItem(**item.model_dump()) for item in payload.items)
 
     db.commit()
     return get_order(order.id, db)
+
+
+@router.post("/{order_id}/preview", response_model=OrderPreviewResponse)
+def preview_order(order_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderPreviewResponse:
+    order = get_order(order_id, db)
+    return OrderPreviewResponse(html=render_order_preview(order))
+
+
+@router.post("/{order_id}/export-excel", response_model=ExcelExportResponse)
+def export_order_excel(order_id: uuid.UUID, db: Session = Depends(get_db)) -> ExcelExportResponse:
+    order = get_order(order_id, db)
+    asset, download_url = export_order_to_xls(db, order)
+    return ExcelExportResponse(file=asset, download_url=download_url)

@@ -162,6 +162,25 @@ class ExcelExportResponse(BaseModel):
     download_url: str
 
 
+class OrderPreviewResponse(BaseModel):
+    html: str
+
+
+class HistoryFileExportRequest(BaseModel):
+    file_ids: list[uuid.UUID] = Field(default_factory=list)
+    order_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class HistoryFileDeleteRequest(BaseModel):
+    file_ids: list[uuid.UUID] = Field(default_factory=list)
+    order_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class HistoryFileDeleteResponse(BaseModel):
+    deleted_files: int
+    deleted_orders: int
+
+
 class OcrAnalyzeRequest(BaseModel):
     file_id: uuid.UUID
     order_id: uuid.UUID | None = None
