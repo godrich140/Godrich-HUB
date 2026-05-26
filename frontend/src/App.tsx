@@ -285,7 +285,11 @@ function mapApiOrder(orderItem: ApiPackingOrder): OrderRecord {
 function isVisibleHistoryRecord(record: OrderRecord) {
   const systemPrefixes = ["PKTEST-", "PKDELETE-", "PKCONTINUE-"];
   const systemCustomers = ["公网重复保存测试", "二次点击公网测试", "继续验证", "批量删除验证"];
-  return !systemPrefixes.some((prefix) => record.id.startsWith(prefix)) && !systemCustomers.includes(record.customer);
+  const isSystemRecord = systemPrefixes.some((prefix) => record.id.startsWith(prefix)) || systemCustomers.includes(record.customer);
+  const isImportPlaceholder =
+    record.id.startsWith("IMP") &&
+    record.rows.some((item) => item.itemName.startsWith("待核对：") || item.description.includes("已接收 Excel 文件"));
+  return !isSystemRecord && !isImportPlaceholder;
 }
 
 function historySelectionKey(record: OrderRecord) {
