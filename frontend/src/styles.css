@@ -1639,7 +1639,7 @@ h2 {
   padding: 0;
   background: transparent;
   color: var(--app-text);
-  cursor: pointer;
+  cursor: default;
   text-align: left;
 }
 
@@ -1648,6 +1648,7 @@ h2 {
   height: 16px;
   margin: 0;
   accent-color: var(--app-blue);
+  cursor: pointer;
 }
 
 .history-select.disabled {

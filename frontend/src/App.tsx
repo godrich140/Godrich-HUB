@@ -282,6 +282,12 @@ function mapApiOrder(orderItem: ApiPackingOrder): OrderRecord {
   };
 }
 
+function isVisibleHistoryRecord(record: OrderRecord) {
+  const systemPrefixes = ["PKTEST-", "PKDELETE-", "PKCONTINUE-"];
+  const systemCustomers = ["公网重复保存测试", "二次点击公网测试", "继续验证", "批量删除验证"];
+  return !systemPrefixes.some((prefix) => record.id.startsWith(prefix)) && !systemCustomers.includes(record.customer);
+}
+
 function historySelectionKey(record: OrderRecord) {
   return record.sourceFileId ?? record.backendId ?? record.id;
 }
@@ -833,7 +839,9 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
   const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<string[]>([]);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const allRecords = [...importedRecords, ...serverRecords, ...records].filter((record, index, source) => source.findIndex((item) => item.id === record.id) === index);
+  const allRecords = [...importedRecords, ...serverRecords]
+    .filter(isVisibleHistoryRecord)
+    .filter((record, index, source) => source.findIndex((item) => item.id === record.id) === index);
   const filtered = allRecords.filter((record) => {
     const matchKeyword = !keyword || `${record.id}${record.customer}`.toLowerCase().includes(keyword.toLowerCase());
     const matchStartDate = !startDate || record.date >= startDate;
@@ -857,7 +865,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
         if (!response.ok) throw new Error(await response.text());
         const payload = (await response.json()) as ApiPackingOrder[];
         if (!isMounted) return;
-        const nextRecords = payload.map(mapApiOrder);
+        const nextRecords = payload.map(mapApiOrder).filter(isVisibleHistoryRecord);
         setServerRecords(nextRecords);
         setActiveId((current) => current || nextRecords[0]?.id || "");
       } catch (error) {
@@ -1052,7 +1060,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
               .join(" ");
             return (
               <div className={cardClass} key={record.id} onClick={() => setActiveId(record.id)} role="button" tabIndex={0} onKeyDown={(event) => event.key === "Enter" && setActiveId(record.id)}>
-                <label className={isSelectable ? "history-select" : "history-select disabled"}>
+                <div className={isSelectable ? "history-select" : "history-select disabled"}>
                   <input
                     checked={isChecked}
                     disabled={!isSelectable}
@@ -1067,7 +1075,7 @@ function HistoryPage({ records }: { records: OrderRecord[] }) {
                     <span>{record.date}</span>
                   </span>
                   <strong className="history-list-total">${amount.toFixed(2)}</strong>
-                </label>
+                </div>
               </div>
             );
           })}
